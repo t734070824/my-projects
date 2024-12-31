@@ -48,57 +48,83 @@ class UI:
             self.last_dps_update = current_time
 
     def draw_health_bar(self, screen, x, y, height, current_health, max_health, show_text=True, show_labels=False):
-        # Draw background (empty health bar)
-        pygame.draw.rect(screen, (80, 0, 0), (x, y, self.PLAYER_BAR_WIDTH, height))
+        # Fixed width for health bar
+        BAR_WIDTH = 200
+        
+        # Ensure health values are not negative
+        current_health = max(0, current_health)
+        max_health = max(1, max_health)  # Prevent division by zero
+        
+        # Draw the black outline
+        pygame.draw.rect(screen, (0, 0, 0), (x, y, BAR_WIDTH, height))
+        
+        # Draw the red background (empty health bar) - full width
+        pygame.draw.rect(screen, (80, 0, 0), (x, y, BAR_WIDTH, height))
         
         # Calculate health ratio and width
         health_ratio = min(max(current_health / max_health, 0), 1.0)
-        health_width = int(self.PLAYER_BAR_WIDTH * health_ratio)
+        health_width = int(BAR_WIDTH * health_ratio)
         
-        # Draw current health
-        if health_ratio > 0.5:
-            color = (0, 255, 0)  # Green when health > 50%
-        elif health_ratio > 0.25:
-            color = (255, 255, 0)  # Yellow when health between 25% and 50%
-        else:
-            color = (255, 0, 0)  # Red when health < 25%
+        # Draw the health bar on top of red background
+        if health_width > 0:
+            if health_ratio > 0.5:
+                color = (0, 255, 0)  # Green when health > 50%
+            elif health_ratio > 0.25:
+                color = (255, 255, 0)  # Yellow when health between 25% and 50%
+            else:
+                color = (255, 0, 0)  # Red when health < 25%
             
-        pygame.draw.rect(screen, color, (x, y, health_width, height))
+            pygame.draw.rect(screen, color, (x, y, health_width, height))
         
         # Draw border
-        pygame.draw.rect(screen, (255, 255, 255), (x, y, self.PLAYER_BAR_WIDTH, height), 1)
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, BAR_WIDTH, height), 1)
         
         # Show health text if requested
         if show_text:
-            health_text = f"{int(current_health)}/{int(max_health)}"
+            # Show 0 if health is negative
+            display_health = max(0, int(current_health))
+            health_text = f"{display_health}/{int(max_health)}"
             text_surface = self.small_font.render(health_text, True, (255, 255, 255))
-            text_rect = text_surface.get_rect(center=(x + self.PLAYER_BAR_WIDTH/2, y + height/2))
+            text_rect = text_surface.get_rect(center=(x + BAR_WIDTH/2, y + height/2))
             screen.blit(text_surface, text_rect)
             
             if show_labels:
                 # Draw health text to the right of the bar
-                health_text = f"HP: {int(current_health)}/{int(max_health)}"
-                health_surface = self.font.render(health_text, True, color)
-                screen.blit(health_surface, (x + self.PLAYER_BAR_WIDTH + 10, y + height/2 - health_surface.get_height()/2))
+                health_text = f"HP: {display_health}/{int(max_health)}"
+                health_surface = self.font.render(health_text, True, (255, 255, 255))
+                screen.blit(health_surface, (x + BAR_WIDTH + 10, y + height/2 - health_surface.get_height()/2))
 
     def draw_enemy_health_bar(self, screen, x, y, height, current_health, max_health):
-        # Draw background (empty health bar)
-        pygame.draw.rect(screen, (80, 0, 0), (x, y, self.ENEMY_BAR_WIDTH, height))
+        # Fixed width for enemy health bar
+        ENEMY_BAR_WIDTH = 40
+        
+        # Ensure health values are not negative
+        current_health = max(0, current_health)
+        max_health = max(1, max_health)  # Prevent division by zero
+        
+        # Draw the black outline
+        pygame.draw.rect(screen, (0, 0, 0), (x, y, ENEMY_BAR_WIDTH, height))
+        
+        # Draw the red background (empty health bar) - full width
+        pygame.draw.rect(screen, (80, 0, 0), (x, y, ENEMY_BAR_WIDTH, height))
         
         # Calculate health ratio and width
         health_ratio = min(max(current_health / max_health, 0), 1.0)
-        health_width = int(self.ENEMY_BAR_WIDTH * health_ratio)
+        health_width = int(ENEMY_BAR_WIDTH * health_ratio)
         
-        # Draw current health
-        if health_ratio > 0.5:
-            color = (0, 255, 0)
-        elif health_ratio > 0.25:
-            color = (255, 255, 0)
-        else:
-            color = (255, 0, 0)
+        # Draw the health bar on top of red background
+        if health_width > 0:
+            if health_ratio > 0.5:
+                color = (0, 255, 0)
+            elif health_ratio > 0.25:
+                color = (255, 255, 0)
+            else:
+                color = (255, 0, 0)
             
-        pygame.draw.rect(screen, color, (x, y, health_width, height))
-        pygame.draw.rect(screen, (255, 255, 255), (x, y, self.ENEMY_BAR_WIDTH, height), 1)
+            pygame.draw.rect(screen, color, (x, y, health_width, height))
+        
+        # Draw border
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, ENEMY_BAR_WIDTH, height), 1)
 
     def draw_exp_bar(self, screen, x, y, height, player):
         # Draw background

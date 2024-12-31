@@ -143,6 +143,38 @@ while running:
             elif event.key == pygame.K_i:
                 # Toggle inventory
                 current_state = GameState.INVENTORY if current_state == GameState.PLAYING else GameState.PLAYING
+            elif event.key == pygame.K_c:
+                # Show player attributes
+                attributes_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                attributes_overlay.fill((0, 0, 0))
+                attributes_overlay.set_alpha(180)
+                screen.blit(attributes_overlay, (0, 0))
+
+                attributes_text = [
+                    f"Level: {player.level}",
+                    f"Health: {player.health}/{player.max_health}",
+                    f"Damage: {player.damage}",
+                    f"Speed: {player.speed:.1f}",
+                    f"Crit Chance: {player.critical_chance * 100:.1f}%",
+                    f"EXP: {player.exp}/{player.exp_to_next_level}"
+                ]
+
+                for i, text in enumerate(attributes_text):
+                    text_surface = ui.font.render(text, True, (255, 255, 255))
+                    screen.blit(text_surface, (SCREEN_WIDTH//2 - text_surface.get_width()//2, SCREEN_HEIGHT//2 - 100 + i * 30))
+
+                pygame.display.flip()
+
+                # Wait for any key to close
+                waiting_for_close = True
+                while waiting_for_close:
+                    for event in pygame.event.get():
+                        if event.type == pygame.KEYDOWN:
+                            waiting_for_close = False
+                        elif event.type == pygame.QUIT:
+                            pygame.quit()
+                            sys.exit()
+                continue
             elif event.key == pygame.K_ESCAPE:
                 if current_state == GameState.INVENTORY:
                     current_state = GameState.PLAYING
@@ -188,6 +220,37 @@ while running:
         for enemy in enemies:
             if (enemy.position - player.position).length() < 30:
                 player.health -= 0.1  # Continuous damage when touching enemy
+
+        # Game over condition
+        if player.health <= 0:
+            print("Game Over")
+            # Display game over sub-window
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.fill((0, 0, 0))
+            overlay.set_alpha(180)
+            screen.blit(overlay, (0, 0))
+
+            game_over_text = ui.font.render("Game Over", True, (255, 0, 0))
+            restart_text = ui.small_font.render("Press R to Restart", True, (255, 255, 255))
+
+            screen.blit(game_over_text, (SCREEN_WIDTH//2 - game_over_text.get_width()//2, SCREEN_HEIGHT//2 - 50))
+            screen.blit(restart_text, (SCREEN_WIDTH//2 - restart_text.get_width()//2, SCREEN_HEIGHT//2 + 10))
+
+            pygame.display.flip()
+
+            # Wait for restart command
+            waiting_for_restart = True
+            while waiting_for_restart:
+                for event in pygame.event.get():
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                        # Restart the game logic
+                        player.health = player.max_health
+                        enemies = wave_system.generate_wave()
+                        waiting_for_restart = False
+                    elif event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
+            continue
 
     # Draw everything
     screen.fill(DARK_GREY)  # Dark background for dungeon feel
