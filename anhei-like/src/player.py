@@ -12,30 +12,49 @@ class Player:
         self.attack_range = 50
         self.attack_cooldown = 0
         self.attack_cooldown_max = 10
+        self.damage = 20  # Base damage
+        self.critical_chance = 0.2  # 20% chance to crit
+        self.critical_multiplier = 2.0  # Critical hits do double damage
+        # Screen boundaries (will be set from main.py)
+        self.screen_width = 1024
+        self.screen_height = 768
+        self.radius = 15  # Player radius for boundary checking
+        
+    def set_boundaries(self, width, height):
+        self.screen_width = width
+        self.screen_height = height
         
     def update(self):
-        # Get keyboard state
+        # Get keyboard state for WASD movement
         keys = pygame.key.get_pressed()
         
-        # Reset direction
-        self.direction = pygame.math.Vector2(0, 0)
+        # Handle movement
+        dx = 0
+        dy = 0
         
-        # WASD movement
         if keys[pygame.K_w]:
-            self.direction.y = -1
+            dy = -self.speed
         if keys[pygame.K_s]:
-            self.direction.y = 1
+            dy = self.speed
         if keys[pygame.K_a]:
-            self.direction.x = -1
+            dx = -self.speed
         if keys[pygame.K_d]:
-            self.direction.x = 1
+            dx = self.speed
             
         # Normalize diagonal movement
-        if self.direction.length() > 0:
-            self.direction = self.direction.normalize()
+        if dx != 0 and dy != 0:
+            dx *= 0.707  # 1/sqrt(2)
+            dy *= 0.707
+            
+        # Calculate new position
+        new_x = self.position.x + dx
+        new_y = self.position.y + dy
         
-        # Update position based on direction
-        self.position += self.direction * self.speed
+        # Check boundaries
+        if self.radius <= new_x <= self.screen_width - self.radius:
+            self.position.x = new_x
+        if self.radius <= new_y <= self.screen_height - self.radius:
+            self.position.y = new_y
         
         # Update rect position
         self.rect.center = self.position
@@ -47,7 +66,13 @@ class Player:
     def can_attack(self):
         return self.attack_cooldown == 0
         
-    def attack(self, enemies):
+    def calculate_damage(self):
+        # Check for critical hit
+        if pygame.time.get_ticks() % 100 < self.critical_chance * 100:
+            return self.damage * self.critical_multiplier
+        return self.damage
+        
+    def attack(self, enemies, ui):
         if not self.can_attack():
             return
             
@@ -60,7 +85,11 @@ class Player:
             # Calculate distance to enemy
             distance = (enemy.position - self.position).length()
             if distance <= self.attack_range:
-                enemy.health -= 20  # Deal damage
+                # Calculate damage
+                damage = self.calculate_damage()
+                enemy.health -= damage
+                # Add damage number
+                ui.add_damage_number(damage, enemy.position.x, enemy.position.y)
                 
         # Set attack cooldown
         self.attack_cooldown = self.attack_cooldown_max
