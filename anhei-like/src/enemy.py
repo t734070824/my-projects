@@ -22,10 +22,27 @@ class Enemy:
         self.screen_height = height
         
     def set_level(self, wave_number):
-        # Scale enemy stats with wave number
-        self.health = 50 + (wave_number - 1) * 10
+        # Base stats
+        base_health = 50
+        base_exp = 20
+        base_speed = 2
+        
+        # Calculate stat multipliers
+        health_multiplier = 1.0 + (wave_number - 1) * 0.2  # +20% health per wave
+        exp_multiplier = 1.0 + (wave_number - 1) * 0.15    # +15% exp per wave
+        speed_multiplier = 1.0 + (wave_number - 1) * 0.1   # +10% speed per wave
+        
+        # Apply bonus every 5 waves
+        bonus_multiplier = 1.0 + (wave_number // 5) * 0.2  # +20% bonus every 5 waves
+        
+        # Set enemy stats
+        self.health = int(base_health * health_multiplier * bonus_multiplier)
         self.max_health = self.health
-        self.exp_value = 20 + (wave_number - 1) * 5  # More exp for higher waves
+        self.exp_value = int(base_exp * exp_multiplier * bonus_multiplier)
+        self.speed = base_speed * speed_multiplier
+        
+        # Cap speed to prevent enemies from being too fast
+        self.speed = min(self.speed, 5.0)
         
     def update(self, player_pos):
         # Move towards player if within detection range

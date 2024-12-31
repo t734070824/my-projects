@@ -32,7 +32,10 @@ class UI:
         self.dps = 0
         self.dps_update_interval = 1.0  # Update DPS every second
         self.last_dps_update = time.time()
-        
+        # Fixed bar widths
+        self.PLAYER_BAR_WIDTH = 200
+        self.ENEMY_BAR_WIDTH = 40
+
     def add_damage_number(self, damage, x, y):
         self.damage_numbers.append(DamageNumber(damage, x, y))
         self.total_damage += damage
@@ -44,13 +47,13 @@ class UI:
             self.total_damage = 0
             self.last_dps_update = current_time
 
-    def draw_health_bar(self, screen, x, y, width, height, current_health, max_health, show_text=True, show_labels=False):
+    def draw_health_bar(self, screen, x, y, height, current_health, max_health, show_text=True, show_labels=False):
         # Draw background (empty health bar)
-        pygame.draw.rect(screen, (80, 0, 0), (x, y, width, height))
+        pygame.draw.rect(screen, (80, 0, 0), (x, y, self.PLAYER_BAR_WIDTH, height))
         
         # Calculate health ratio and width
-        health_ratio = max(current_health / max_health, 0)
-        health_width = int(width * health_ratio)  # Ensure width is an integer
+        health_ratio = min(max(current_health / max_health, 0), 1.0)
+        health_width = int(self.PLAYER_BAR_WIDTH * health_ratio)
         
         # Draw current health
         if health_ratio > 0.5:
@@ -63,31 +66,50 @@ class UI:
         pygame.draw.rect(screen, color, (x, y, health_width, height))
         
         # Draw border
-        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 1)  # Thinner border
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, self.PLAYER_BAR_WIDTH, height), 1)
         
         # Show health text if requested
         if show_text:
             health_text = f"{int(current_health)}/{int(max_health)}"
             text_surface = self.small_font.render(health_text, True, (255, 255, 255))
-            text_rect = text_surface.get_rect(center=(x + width/2, y + height/2))
+            text_rect = text_surface.get_rect(center=(x + self.PLAYER_BAR_WIDTH/2, y + height/2))
             screen.blit(text_surface, text_rect)
             
             if show_labels:
-                # Draw current/max health text
+                # Draw health text to the right of the bar
                 health_text = f"HP: {int(current_health)}/{int(max_health)}"
                 health_surface = self.font.render(health_text, True, color)
-                screen.blit(health_surface, (x + width + 10, y + 5))
+                screen.blit(health_surface, (x + self.PLAYER_BAR_WIDTH + 10, y + height/2 - health_surface.get_height()/2))
+
+    def draw_enemy_health_bar(self, screen, x, y, height, current_health, max_health):
+        # Draw background (empty health bar)
+        pygame.draw.rect(screen, (80, 0, 0), (x, y, self.ENEMY_BAR_WIDTH, height))
         
-    def draw_exp_bar(self, screen, x, y, width, height, player):
+        # Calculate health ratio and width
+        health_ratio = min(max(current_health / max_health, 0), 1.0)
+        health_width = int(self.ENEMY_BAR_WIDTH * health_ratio)
+        
+        # Draw current health
+        if health_ratio > 0.5:
+            color = (0, 255, 0)
+        elif health_ratio > 0.25:
+            color = (255, 255, 0)
+        else:
+            color = (255, 0, 0)
+            
+        pygame.draw.rect(screen, color, (x, y, health_width, height))
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, self.ENEMY_BAR_WIDTH, height), 1)
+
+    def draw_exp_bar(self, screen, x, y, height, player):
         # Draw background
-        pygame.draw.rect(screen, (40, 40, 40), (x, y, width, height))
+        pygame.draw.rect(screen, (40, 40, 40), (x, y, self.PLAYER_BAR_WIDTH, height))
         
         # Draw exp progress
-        exp_width = int(width * player.get_exp_percentage())
+        exp_width = int(self.PLAYER_BAR_WIDTH * player.get_exp_percentage())
         pygame.draw.rect(screen, (0, 200, 255), (x, y, exp_width, height))
         
         # Draw border
-        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 1)
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, self.PLAYER_BAR_WIDTH, height), 1)
         
         # Draw level and exp text
         level_text = f"Level {player.level}"
@@ -99,8 +121,8 @@ class UI:
         
         # Render exp text
         exp_surface = self.small_font.render(exp_text, True, (0, 200, 255))
-        screen.blit(exp_surface, (x + width - exp_surface.get_width(), y - 20))
-        
+        screen.blit(exp_surface, (x + self.PLAYER_BAR_WIDTH - exp_surface.get_width(), y - 20))
+
     def draw(self, screen, player, enemies):
         # Draw FPS
         fps = int(pygame.time.Clock().get_fps())
@@ -112,28 +134,32 @@ class UI:
         screen.blit(dps_text, (10, 80))
         
         # Draw player health bar
-        self.draw_health_bar(screen, 10, 10, 200, 20, player.health, player.max_health, True, True)
+        health_bar_height = 20
+        self.draw_health_bar(screen, 10, 10, health_bar_height, player.health, player.max_health, True, True)
         
         # Draw experience bar below health bar
-        self.draw_exp_bar(screen, 10, 35, 200, 5, player)
+        self.draw_exp_bar(screen, 10, 35, 5, player)
+        
+        # Draw player stats on the right side
+        stats_x = screen.get_width() - 200
+        stats_y = 10
+        stats_text = [
+            f"Damage: {int(player.damage)}",
+            f"Speed: {player.speed:.1f}",
+            f"Crit: {int(player.critical_chance * 100)}%"
+        ]
+        
+        for i, text in enumerate(stats_text):
+            text_surface = self.small_font.render(text, True, (200, 200, 200))
+            screen.blit(text_surface, (stats_x, stats_y + i * 20))
         
         # Draw enemy health bars
         for enemy in enemies:
-            # Calculate health bar position
-            bar_width = 40
             bar_height = 4
-            bar_x = enemy.position.x - bar_width/2
+            bar_x = enemy.position.x - self.ENEMY_BAR_WIDTH/2
             bar_y = enemy.position.y - enemy.radius - 10
             
-            # Draw enemy health bar
-            self.draw_health_bar(screen, 
-                               bar_x,
-                               bar_y,
-                               bar_width,
-                               bar_height,
-                               enemy.health,
-                               enemy.max_health,
-                               False)  # Don't show text in bar
+            self.draw_enemy_health_bar(screen, bar_x, bar_y, bar_height, enemy.health, enemy.max_health)
             
             # Draw enemy health text above health bar
             health_text = f"{int(enemy.health)}/{int(enemy.max_health)}"

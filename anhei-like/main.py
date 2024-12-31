@@ -60,25 +60,39 @@ class WaveSystem:
         
     def generate_wave(self):
         enemies = []
-        num_enemies = self.enemies_per_wave + (self.current_wave - 1)
+        if self.current_wave == 1:
+            num_enemies = 15  # Start with 15 enemies
+        else:
+            # Increase enemies by 3 each wave, plus bonus enemies every 5 waves
+            base_increase = (self.current_wave - 1) * 3
+            bonus_enemies = (self.current_wave // 5) * 2  # Every 5 waves add 2 extra enemies
+            num_enemies = 15 + base_increase + bonus_enemies
+        
         print(f"Generating wave {self.current_wave} with {num_enemies} enemies")
         
         spawn_margin = 50  # Margin from screen edges
         
+        # Calculate spawn positions for enemies
         for i in range(num_enemies):
-            # Choose a random spawn position along the screen edges
-            if random.random() < 0.5:  # Top or bottom
+            # Randomly choose which edge to spawn from
+            edge = random.choice(['top', 'bottom', 'left', 'right'])
+            
+            if edge == 'top':
                 x = random.randint(spawn_margin, self.screen_width - spawn_margin)
-                y = spawn_margin if random.random() < 0.5 else self.screen_height - spawn_margin
-            else:  # Left or right
-                x = spawn_margin if random.random() < 0.5 else self.screen_width - spawn_margin
+                y = spawn_margin
+            elif edge == 'bottom':
+                x = random.randint(spawn_margin, self.screen_width - spawn_margin)
+                y = self.screen_height - spawn_margin
+            elif edge == 'left':
+                x = spawn_margin
                 y = random.randint(spawn_margin, self.screen_height - spawn_margin)
-                
+            else:  # right
+                x = self.screen_width - spawn_margin
+                y = random.randint(spawn_margin, self.screen_height - spawn_margin)
+            
             enemy = Enemy(x, y)
             enemy.set_boundaries(self.screen_width, self.screen_height)
-            # Increase enemy stats with each wave
-            enemy.health = 50 + (self.current_wave - 1) * 10
-            enemy.max_health = enemy.health
+            # Scale enemy stats with wave number
             enemy.set_level(self.current_wave)
             enemies.append(enemy)
             print(f"Spawned enemy {i+1} at position ({x}, {y})")

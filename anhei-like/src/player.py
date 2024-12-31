@@ -8,21 +8,22 @@ class Player:
         self.speed = 5
         self.health = 100
         self.max_health = 100
+        self.health_multiplier = 1.0
         self.image = None
         self.rect = pygame.Rect(x - 15, y - 15, 30, 30)
         self.attack_range = 50
         self.attack_cooldown = 0
         self.attack_cooldown_max = 10
-        self.damage = 20  # Base damage
-        self.critical_chance = 0.2  # 20% chance to crit
-        self.critical_multiplier = 2.0  # Critical hits do double damage
+        self.damage = 20
+        self.critical_chance = 0.2
+        self.critical_multiplier = 2.0
         
         # Level system
         self.level = 1
         self.exp = 0
-        self.exp_to_next_level = 100  # Base exp needed
+        self.exp_to_next_level = 100
         
-        # Stats that improve with level
+        # Base stats
         self.base_damage = 20
         self.base_health = 100
         self.base_speed = 5
@@ -45,21 +46,21 @@ class Player:
     def level_up(self):
         self.level += 1
         self.exp -= self.exp_to_next_level
-        self.exp_to_next_level = int(self.exp_to_next_level * 1.5)  # 50% more exp needed each level
+        self.exp_to_next_level = int(self.exp_to_next_level * 1.5)
         
         # Improve stats
         self.base_damage += 5
-        self.base_health += 20
+        self.health_multiplier += 0.2
         self.base_speed += 0.2
         self.base_crit_chance += 0.01
         
         # Update current stats
         self.damage = self.base_damage
         old_health_ratio = self.health / self.max_health
-        self.max_health = self.base_health
-        self.health = int(self.max_health * old_health_ratio)  # Keep same health percentage
+        self.max_health = int(self.base_health * self.health_multiplier)
+        self.health = int(self.max_health * old_health_ratio)
         self.speed = self.base_speed
-        self.critical_chance = min(0.5, self.base_crit_chance)  # Cap crit chance at 50%
+        self.critical_chance = min(0.5, self.base_crit_chance)
         
         # Heal 20% of max health on level up
         heal_amount = self.max_health * 0.2
