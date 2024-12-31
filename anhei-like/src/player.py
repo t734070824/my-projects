@@ -1,4 +1,5 @@
 import pygame
+import math
 
 class Player:
     def __init__(self, x, y):
@@ -15,6 +16,18 @@ class Player:
         self.damage = 20  # Base damage
         self.critical_chance = 0.2  # 20% chance to crit
         self.critical_multiplier = 2.0  # Critical hits do double damage
+        
+        # Level system
+        self.level = 1
+        self.exp = 0
+        self.exp_to_next_level = 100  # Base exp needed
+        
+        # Stats that improve with level
+        self.base_damage = 20
+        self.base_health = 100
+        self.base_speed = 5
+        self.base_crit_chance = 0.2
+        
         # Screen boundaries (will be set from main.py)
         self.screen_width = 1024
         self.screen_height = 768
@@ -23,6 +36,37 @@ class Player:
     def set_boundaries(self, width, height):
         self.screen_width = width
         self.screen_height = height
+        
+    def gain_exp(self, amount):
+        self.exp += amount
+        while self.exp >= self.exp_to_next_level:
+            self.level_up()
+    
+    def level_up(self):
+        self.level += 1
+        self.exp -= self.exp_to_next_level
+        self.exp_to_next_level = int(self.exp_to_next_level * 1.5)  # 50% more exp needed each level
+        
+        # Improve stats
+        self.base_damage += 5
+        self.base_health += 20
+        self.base_speed += 0.2
+        self.base_crit_chance += 0.01
+        
+        # Update current stats
+        self.damage = self.base_damage
+        old_health_ratio = self.health / self.max_health
+        self.max_health = self.base_health
+        self.health = int(self.max_health * old_health_ratio)  # Keep same health percentage
+        self.speed = self.base_speed
+        self.critical_chance = min(0.5, self.base_crit_chance)  # Cap crit chance at 50%
+        
+        # Heal 20% of max health on level up
+        heal_amount = self.max_health * 0.2
+        self.health = min(self.max_health, self.health + heal_amount)
+        
+    def get_exp_percentage(self):
+        return self.exp / self.exp_to_next_level
         
     def update(self):
         # Get keyboard state for WASD movement

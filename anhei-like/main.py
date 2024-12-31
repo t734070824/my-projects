@@ -63,27 +63,23 @@ class WaveSystem:
         num_enemies = self.enemies_per_wave + (self.current_wave - 1)
         print(f"Generating wave {self.current_wave} with {num_enemies} enemies")
         
+        spawn_margin = 50  # Margin from screen edges
+        
         for i in range(num_enemies):
-            # Randomly choose spawn side (top, bottom, left, right)
-            side = random.choice(['top', 'bottom', 'left', 'right'])
-            
-            if side == 'top':
-                x = random.randint(50, self.screen_width - 50)
-                y = -30
-            elif side == 'bottom':
-                x = random.randint(50, self.screen_width - 50)
-                y = self.screen_height + 30
-            elif side == 'left':
-                x = -30
-                y = random.randint(50, self.screen_height - 50)
-            else:  # right
-                x = self.screen_width + 30
-                y = random.randint(50, self.screen_height - 50)
+            # Choose a random spawn position along the screen edges
+            if random.random() < 0.5:  # Top or bottom
+                x = random.randint(spawn_margin, self.screen_width - spawn_margin)
+                y = spawn_margin if random.random() < 0.5 else self.screen_height - spawn_margin
+            else:  # Left or right
+                x = spawn_margin if random.random() < 0.5 else self.screen_width - spawn_margin
+                y = random.randint(spawn_margin, self.screen_height - spawn_margin)
                 
             enemy = Enemy(x, y)
+            enemy.set_boundaries(self.screen_width, self.screen_height)
             # Increase enemy stats with each wave
             enemy.health = 50 + (self.current_wave - 1) * 10
             enemy.max_health = enemy.health
+            enemy.set_level(self.current_wave)
             enemies.append(enemy)
             print(f"Spawned enemy {i+1} at position ({x}, {y})")
             
@@ -169,8 +165,10 @@ while running:
             enemy.update(player.position)
             # Remove dead enemies
             if enemy.health <= 0:
+                # Give experience to player
+                player.gain_exp(enemy.exp_value)
                 enemies.remove(enemy)
-                print(f"Enemy defeated, {len(enemies)} enemies remaining")
+                print(f"Enemy defeated, gained {enemy.exp_value} exp, {len(enemies)} enemies remaining")
 
         # Check for collisions
         for enemy in enemies:

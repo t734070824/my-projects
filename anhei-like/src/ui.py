@@ -50,7 +50,7 @@ class UI:
         
         # Calculate health ratio and width
         health_ratio = max(current_health / max_health, 0)
-        health_width = width * health_ratio
+        health_width = int(width * health_ratio)  # Ensure width is an integer
         
         # Draw current health
         if health_ratio > 0.5:
@@ -63,7 +63,7 @@ class UI:
         pygame.draw.rect(screen, color, (x, y, health_width, height))
         
         # Draw border
-        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 2)
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 1)  # Thinner border
         
         # Show health text if requested
         if show_text:
@@ -78,6 +78,29 @@ class UI:
                 health_surface = self.font.render(health_text, True, color)
                 screen.blit(health_surface, (x + width + 10, y + 5))
         
+    def draw_exp_bar(self, screen, x, y, width, height, player):
+        # Draw background
+        pygame.draw.rect(screen, (40, 40, 40), (x, y, width, height))
+        
+        # Draw exp progress
+        exp_width = int(width * player.get_exp_percentage())
+        pygame.draw.rect(screen, (0, 200, 255), (x, y, exp_width, height))
+        
+        # Draw border
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 1)
+        
+        # Draw level and exp text
+        level_text = f"Level {player.level}"
+        exp_text = f"EXP: {player.exp}/{player.exp_to_next_level}"
+        
+        # Render level text
+        level_surface = self.font.render(level_text, True, (255, 255, 255))
+        screen.blit(level_surface, (x, y - 25))
+        
+        # Render exp text
+        exp_surface = self.small_font.render(exp_text, True, (0, 200, 255))
+        screen.blit(exp_surface, (x + width - exp_surface.get_width(), y - 20))
+        
     def draw(self, screen, player, enemies):
         # Draw FPS
         fps = int(pygame.time.Clock().get_fps())
@@ -88,23 +111,34 @@ class UI:
         dps_text = self.font.render(f'DPS: {int(self.dps)}', True, (255, 200, 0))
         screen.blit(dps_text, (10, 80))
         
-        # Draw player health bar (larger, with text and labels)
+        # Draw player health bar
         self.draw_health_bar(screen, 10, 10, 200, 20, player.health, player.max_health, True, True)
         
-        # Draw enemy health bars (smaller, with text)
+        # Draw experience bar below health bar
+        self.draw_exp_bar(screen, 10, 35, 200, 5, player)
+        
+        # Draw enemy health bars
         for enemy in enemies:
+            # Calculate health bar position
+            bar_width = 40
+            bar_height = 4
+            bar_x = enemy.position.x - bar_width/2
+            bar_y = enemy.position.y - enemy.radius - 10
+            
             # Draw enemy health bar
             self.draw_health_bar(screen, 
-                               enemy.position.x - 20,  # Center the health bar
-                               enemy.position.y - 25,  # Position above enemy
-                               40, 5,                  # Width and height
-                               enemy.health, enemy.max_health,
-                               True)                   # Show text for enemies
+                               bar_x,
+                               bar_y,
+                               bar_width,
+                               bar_height,
+                               enemy.health,
+                               enemy.max_health,
+                               False)  # Don't show text in bar
             
             # Draw enemy health text above health bar
             health_text = f"{int(enemy.health)}/{int(enemy.max_health)}"
             text_surface = self.small_font.render(health_text, True, (255, 255, 255))
-            text_rect = text_surface.get_rect(center=(enemy.position.x, enemy.position.y - 35))
+            text_rect = text_surface.get_rect(center=(enemy.position.x, bar_y - 5))
             screen.blit(text_surface, text_rect)
         
         # Update and draw damage numbers
