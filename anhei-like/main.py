@@ -41,45 +41,51 @@ class WaveSystem:
         self.spawn_timer = 0
         self.spawn_delay = 3  # 3 seconds delay between waves
         self.waiting_for_spawn = False
+        self.last_spawn_time = time.time()
         
     def should_spawn_wave(self):
         if self.waiting_for_spawn:
             current_time = time.time()
             if current_time - self.spawn_timer >= self.spawn_delay:
                 self.waiting_for_spawn = False
+                self.last_spawn_time = current_time
                 return True
         return False
     
     def start_spawn_timer(self):
-        self.spawn_timer = time.time()
-        self.waiting_for_spawn = True
+        if not self.waiting_for_spawn:  # Only start timer if not already waiting
+            print("Starting spawn timer")
+            self.spawn_timer = time.time()
+            self.waiting_for_spawn = True
         
     def generate_wave(self):
         enemies = []
         num_enemies = self.enemies_per_wave + (self.current_wave - 1)
+        print(f"Generating wave {self.current_wave} with {num_enemies} enemies")
         
-        for _ in range(num_enemies):
+        for i in range(num_enemies):
             # Randomly choose spawn side (top, bottom, left, right)
             side = random.choice(['top', 'bottom', 'left', 'right'])
             
             if side == 'top':
-                x = random.randint(0, self.screen_width)
+                x = random.randint(50, self.screen_width - 50)
                 y = -30
             elif side == 'bottom':
-                x = random.randint(0, self.screen_width)
+                x = random.randint(50, self.screen_width - 50)
                 y = self.screen_height + 30
             elif side == 'left':
                 x = -30
-                y = random.randint(0, self.screen_height)
+                y = random.randint(50, self.screen_height - 50)
             else:  # right
                 x = self.screen_width + 30
-                y = random.randint(0, self.screen_height)
+                y = random.randint(50, self.screen_height - 50)
                 
             enemy = Enemy(x, y)
             # Increase enemy stats with each wave
             enemy.health = 50 + (self.current_wave - 1) * 10
             enemy.max_health = enemy.health
             enemies.append(enemy)
+            print(f"Spawned enemy {i+1} at position ({x}, {y})")
             
         self.current_wave += 1
         return enemies
@@ -87,10 +93,13 @@ class WaveSystem:
 # Initialize game objects
 world = World()
 player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-player.set_boundaries(SCREEN_WIDTH, SCREEN_HEIGHT)  # Set screen boundaries
+player.set_boundaries(SCREEN_WIDTH, SCREEN_HEIGHT)
 wave_system = WaveSystem(SCREEN_WIDTH, SCREEN_HEIGHT)
-enemies = wave_system.generate_wave()  # Initial wave
+enemies = []  # Start with no enemies
 ui = UI()
+
+# Force spawn first wave immediately
+enemies = wave_system.generate_wave()
 
 current_state = GameState.PLAYING
 keys = {
@@ -102,6 +111,8 @@ keys = {
 
 # Game loop
 running = True
+last_enemy_check = time.time()
+
 while running:
     # Handle events
     for event in pygame.event.get():
@@ -140,16 +151,18 @@ while running:
         # Update player
         player.update()
 
-        # Check if all enemies are defeated
-        if len(enemies) == 0 and not wave_system.waiting_for_spawn:
-            print("Starting spawn timer")  # Debug print
-            wave_system.start_spawn_timer()
+        # Check if all enemies are defeated (only check every 0.5 seconds)
+        current_time = time.time()
+        if len(enemies) == 0 and current_time - last_enemy_check >= 0.5:
+            last_enemy_check = current_time
+            if not wave_system.waiting_for_spawn:
+                wave_system.start_spawn_timer()
+                print(f"No enemies left, starting spawn timer")
             
         # Spawn new wave if it's time
         if wave_system.should_spawn_wave():
-            print(f"Spawning wave {wave_system.current_wave}")  # Debug print
             enemies = wave_system.generate_wave()
-            print(f"Spawned {len(enemies)} enemies")  # Debug print
+            print(f"Spawned new wave with {len(enemies)} enemies")
 
         # Update enemies
         for enemy in enemies[:]:  # Create a copy of the list to safely remove enemies
@@ -157,6 +170,7 @@ while running:
             # Remove dead enemies
             if enemy.health <= 0:
                 enemies.remove(enemy)
+                print(f"Enemy defeated, {len(enemies)} enemies remaining")
 
         # Check for collisions
         for enemy in enemies:
