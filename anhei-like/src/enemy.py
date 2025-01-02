@@ -16,6 +16,8 @@ class Enemy:
         self.screen_height = 768
         # Experience value
         self.exp_value = 20  # Base exp value
+        # Track previous health for damage display
+        self.previous_health = self.health
         
     def set_boundaries(self, width, height):
         self.screen_width = width
@@ -65,6 +67,13 @@ class Enemy:
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
             
+    def take_damage(self, amount, ui):
+        # Apply damage
+        self.previous_health = self.health
+        self.health = max(self.health - amount, 0)
+        # Add damage number to UI
+        ui.add_damage_number(self.position.x, self.position.y - self.radius, amount)
+
     def draw(self, screen):
         # Draw the enemy as a red circle
         pygame.draw.circle(screen, (255, 0, 0), self.position, self.radius)

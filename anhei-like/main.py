@@ -152,11 +152,13 @@ while running:
 
                 attributes_text = [
                     f"Level: {player.level}",
-                    f"Health: {player.health}/{player.max_health}",
+                    f"Health: {player.health:.1f}/{player.max_health}",
                     f"Damage: {player.damage}",
                     f"Speed: {player.speed:.1f}",
                     f"Crit Chance: {player.critical_chance * 100:.1f}%",
-                    f"EXP: {player.exp}/{player.exp_to_next_level}"
+                    f"EXP: {player.exp}/{player.exp_to_next_level}",
+                    f"Attack: {player.attack_power}",
+                    f"Defense: {player.defense}"
                 ]
 
                 for i, text in enumerate(attributes_text):

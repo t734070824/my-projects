@@ -34,6 +34,12 @@ class Player:
         self.screen_height = 768
         self.radius = 15  # Player radius for boundary checking
         
+        # New attributes
+        self.attack_power = 20
+        self.defense = 10
+        # Track previous health for UI effects
+        self.previous_health = self.health
+        
     def set_boundaries(self, width, height):
         self.screen_width = width
         self.screen_height = height
@@ -107,6 +113,9 @@ class Player:
         # Update attack cooldown
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
+        
+        # Update previous health
+        self.previous_health = self.health
         
     def can_attack(self):
         return self.attack_cooldown == 0

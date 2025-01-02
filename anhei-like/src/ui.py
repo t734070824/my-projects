@@ -2,25 +2,24 @@ import pygame
 import time
 
 class DamageNumber:
-    def __init__(self, damage, x, y):
-        self.damage = damage
+    def __init__(self, x, y, amount):
         self.position = pygame.math.Vector2(x, y)
-        self.creation_time = time.time()
-        self.lifetime = 1.0  # Show for 1 second
-        self.speed = -50  # Float upward
-
-    def is_alive(self):
-        return time.time() - self.creation_time < self.lifetime
+        self.amount = amount
+        self.lifetime = 60  # Display for 60 frames
 
     def draw(self, screen, font):
-        # Calculate alpha based on remaining lifetime
-        alpha = int(255 * (1 - (time.time() - self.creation_time) / self.lifetime))
-        # Move upward
-        self.position.y += self.speed * (1/60)  # Assuming 60 FPS
-        # Render text
-        text = font.render(str(int(self.damage)), True, (255, 200, 0))
-        text.set_alpha(alpha)
-        screen.blit(text, self.position)
+        # Render the damage amount
+        damage_text = font.render(f"{self.amount}", True, (255, 0, 0))
+        text_rect = damage_text.get_rect(center=(self.position.x, self.position.y))
+        screen.blit(damage_text, text_rect)
+
+        # Update position for floating effect
+        self.position.y -= 0.5
+        # Decrease lifetime
+        self.lifetime -= 1
+
+    def is_alive(self):
+        return self.lifetime > 0
 
 class UI:
     def __init__(self):
@@ -36,36 +35,33 @@ class UI:
         self.PLAYER_BAR_WIDTH = 200
         self.ENEMY_BAR_WIDTH = 40
 
-    def add_damage_number(self, damage, x, y):
-        self.damage_numbers.append(DamageNumber(damage, x, y))
-        self.total_damage += damage
-        current_time = time.time()
-        
-        # Update DPS
-        if current_time - self.last_dps_update >= self.dps_update_interval:
-            self.dps = self.total_damage / self.dps_update_interval
-            self.total_damage = 0
-            self.last_dps_update = current_time
+    def add_damage_number(self, x, y, amount):
+        # Create a new damage number effect
+        damage_number = DamageNumber(x, y, amount)
+        self.damage_numbers.append(damage_number)
 
-    def draw_health_bar(self, screen, x, y, height, current_health, max_health, show_text=True, show_labels=False):
-        # Fixed width for health bar
-        BAR_WIDTH = 200
-        
+    def draw_health_bar(self, screen, x, y, height, current_health, max_health, previous_health=None, show_text=True, show_labels=False):
+        # Debugging: Print health values
+        print(f"Current Health: {current_health}, Previous Health: {previous_health}")
+
+        # Set a fixed width for the health bar
+        BAR_WIDTH = 200  # This keeps the health bar length constant
+
         # Ensure health values are not negative
         current_health = max(0, current_health)
         max_health = max(1, max_health)  # Prevent division by zero
-        
-        # Draw the black outline
+
+        # Draw the black outline of the health bar
         pygame.draw.rect(screen, (0, 0, 0), (x, y, BAR_WIDTH, height))
-        
+
         # Draw the red background (empty health bar) - full width
         pygame.draw.rect(screen, (80, 0, 0), (x, y, BAR_WIDTH, height))
-        
-        # Calculate health ratio and width
+
+        # Calculate health ratio and width of the filled portion
         health_ratio = min(max(current_health / max_health, 0), 1.0)
         health_width = int(BAR_WIDTH * health_ratio)
-        
-        # Draw the health bar on top of red background
+
+        # Draw the filled portion of the health bar
         if health_width > 0:
             if health_ratio > 0.5:
                 color = (0, 255, 0)  # Green when health > 50%
@@ -73,21 +69,29 @@ class UI:
                 color = (255, 255, 0)  # Yellow when health between 25% and 50%
             else:
                 color = (255, 0, 0)  # Red when health < 25%
-            
+
             pygame.draw.rect(screen, color, (x, y, health_width, height))
-        
-        # Draw border
+
+        # Draw the lost health portion
+        if previous_health is not None and previous_health > current_health:
+            previous_health_ratio = min(max(previous_health / max_health, 0), 1.0)
+            previous_health_width = int(BAR_WIDTH * previous_health_ratio)
+            lost_health_width = previous_health_width - health_width
+            if lost_health_width > 0:
+                pygame.draw.rect(screen, (139, 0, 0), (x + health_width, y, lost_health_width, height))  # Dark red for lost health
+
+        # Draw border around the health bar
         pygame.draw.rect(screen, (255, 255, 255), (x, y, BAR_WIDTH, height), 1)
-        
+
         # Show health text if requested
         if show_text:
-            # Show 0 if health is negative
+            # Display health as 0 if negative
             display_health = max(0, int(current_health))
             health_text = f"{display_health}/{int(max_health)}"
             text_surface = self.small_font.render(health_text, True, (255, 255, 255))
             text_rect = text_surface.get_rect(center=(x + BAR_WIDTH/2, y + height/2))
             screen.blit(text_surface, text_rect)
-            
+
             if show_labels:
                 # Draw health text to the right of the bar
                 health_text = f"HP: {display_health}/{int(max_health)}"
@@ -159,9 +163,13 @@ class UI:
         dps_text = self.font.render(f'DPS: {int(self.dps)}', True, (255, 200, 0))
         screen.blit(dps_text, (10, 80))
         
-        # Draw player health bar
+        # Calculate the position for the health bar above the player's head
         health_bar_height = 20
-        self.draw_health_bar(screen, 10, 10, health_bar_height, player.health, player.max_health, True, True)
+        player_bar_x = player.position.x - 200 / 2
+        player_bar_y = player.position.y - player.radius - health_bar_height - 5
+
+        # Draw player health bar above the player's head
+        self.draw_health_bar(screen, player_bar_x, player_bar_y, health_bar_height, player.health, player.max_health, player.previous_health, True, True)
         
         # Draw experience bar below health bar
         self.draw_exp_bar(screen, 10, 35, 5, player)
