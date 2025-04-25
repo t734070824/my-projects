@@ -21,12 +21,20 @@ def img_show(img):
 img = x_train[0]
 label = t_train[0]
 
-print(label)
+# print(label)
 
-print(img.shape)
-img = img.reshape(28, 28)
-print(img.shape)
+# print(img.shape)
+# img = img.reshape(28, 28)
+# print(img.shape)
 
-img_show(img)
+# img_show(img)
 
 
+def get_data():
+    (x_train, t_train), (x_test, t_test) = load_mnist(normalize=False, flatten=True)
+    return x_test, t_test
+
+def init_network():
+    with open("sample_weight.pkl", 'rb') as f:
+        network = pickle.load(f)
+    return network
