@@ -123,3 +123,6 @@ all_data.drop('Ticket', axis=1, inplace=True)
 print("=========================================")
 
 print(all_data[all_data.Embarked.isnull()])
+
+
+all_data.loc[all_data.Embarked.isnull(), 'Embarked'] = 'S'
