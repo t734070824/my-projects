@@ -33,7 +33,7 @@ trans_compose = transforms.Compose([trans_resize_2,tensor_trans])
 img_resize_2 = trans_compose(img)
 writer.add_image('Resize',img_resize_2, 2)
 
-trans_random = transforms.RandomCrop(512,10)
+trans_random = transforms.RandomCrop(512)
 trans_compose_2 = transforms.Compose([trans_random,tensor_trans])
 for i in range(10):
     img_crop = trans_compose_2(img)

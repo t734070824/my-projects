@@ -31,3 +31,5 @@ bees_dataset = Mydata(root_dir, bees_bale_dir)
 
 img, label = bees_dataset[1]
 
+
+train_dataset = ants_dataset + bees_dataset
