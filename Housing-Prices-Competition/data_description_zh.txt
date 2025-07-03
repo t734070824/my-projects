@@ -1,0 +1,457 @@
+我来为你翻译这个房屋价格竞赛的数据描述文件：
+
+## 房屋价格竞赛数据描述
+
+### 基础信息
+**MSSubClass**: 识别销售中涉及的住宅类型
+- 20: 1946年及以后新建的单层所有风格
+- 30: 1945年及以前的单层
+- 40: 所有年代的带完工阁楼的单层
+- 45: 所有年代的1.5层未完工
+- 50: 所有年代的1.5层完工
+- 60: 1946年及以后新建的两层
+- 70: 1945年及以前的两层
+- 75: 所有年代的2.5层
+- 80: 分层或多层
+- 85: 分层门厅
+- 90: 所有风格和年代的复式
+- 120: 1946年及以后新建的单层PUD（规划单元开发）
+- 150: 所有年代的1.5层PUD
+- 160: 1946年及以后新建的两层PUD
+- 180: 多层PUD - 包括分层/门厅
+- 190: 所有风格和年代的两户转换
+
+**MSZoning**: 识别销售的一般分区分类
+- A: 农业
+- C: 商业
+- FV: 浮动村住宅
+- I: 工业
+- RH: 高密度住宅
+- RL: 低密度住宅
+- RP: 低密度公园住宅
+- RM: 中密度住宅
+
+### 地块信息
+**LotFrontage**: 连接到房产的街道线性英尺数
+**LotArea**: 地块面积（平方英尺）
+
+**Street**: 通往房产的道路类型
+- Grvl: 砾石
+- Pave: 铺装
+
+**Alley**: 通往房产的小巷类型
+- Grvl: 砾石
+- Pave: 铺装
+- NA: 无小巷通道
+
+**LotShape**: 地块的一般形状
+- Reg: 规则
+- IR1: 轻微不规则
+- IR2: 中等不规则
+- IR3: 不规则
+
+**LandContour**: 地块的平坦度
+- Lvl: 接近平坦/水平
+- Bnk: 倾斜 - 从街道到建筑快速显著上升
+- HLS: 山坡 - 从侧面到侧面显著坡度
+- Low: 洼地
+
+**Utilities**: 可用设施类型
+- AllPub: 所有公共设施（电、气、水、下水道）
+- NoSewr: 电、气、水（化粪池）
+- NoSeWa: 仅电、气
+- ELO: 仅电
+
+**LotConfig**: 地块配置
+- Inside: 内部地块
+- Corner: 角落地块
+- CulDSac: 死胡同
+- FR2: 房产两侧临街
+- FR3: 房产三侧临街
+
+**LandSlope**: 地块坡度
+- Gtl: 缓坡
+- Mod: 中等坡度
+- Sev: 陡坡
+
+### 邻里信息
+**Neighborhood**: Ames市范围内的物理位置
+- Blmngtn: 布卢明顿高地
+- Blueste: 蓝茎
+- BrDale: 布里尔代尔
+- BrkSide: 布鲁克赛德
+- ClearCr: 清水溪
+- CollgCr: 大学溪
+- Crawfor: 克劳福德
+- Edwards: 爱德华兹
+- Gilbert: 吉尔伯特
+- IDOTRR: 爱荷华交通部和铁路
+- MeadowV: 草地村
+- Mitchel: 米切尔
+- Names: 北艾姆斯
+- NoRidge: 北岭
+- NPkVill: 北公园别墅
+- NridgHt: 北岭高地
+- NWAmes: 西北艾姆斯
+- OldTown: 老城
+- SWISU: 爱荷华州立大学西南
+- Sawyer: 索耶
+- SawyerW: 西索耶
+- Somerst: 萨默塞特
+- StoneBr: 石溪
+- Timber: 林地
+- Veenker: 温克尔
+
+### 条件信息
+**Condition1**: 与各种条件的接近程度
+- Artery: 邻近主干道
+- Feedr: 邻近支路
+- Norm: 正常
+- RRNn: 200英尺内南北铁路
+- RRAn: 邻近南北铁路
+- PosN: 邻近正面场外特征（公园、绿化带等）
+- PosA: 邻近正面场外特征
+- RRNe: 200英尺内东西铁路
+- RRAe: 邻近东西铁路
+
+**Condition2**: 与各种条件的接近程度（如果存在多个）
+- 与Condition1相同的选项
+
+### 建筑信息
+**BldgType**: 住宅类型
+- 1Fam: 独户独立
+- 2FmCon: 两户转换；原建为一户住宅
+- Duplx: 复式
+- TwnhsE: 联排别墅端单元
+- TwnhsI: 联排别墅内部单元
+
+**HouseStyle**: 住宅风格
+- 1Story: 一层
+- 1.5Fin: 一层半：二楼完工
+- 1.5Unf: 一层半：二楼未完工
+- 2Story: 两层
+- 2.5Fin: 两层半：二楼完工
+- 2.5Unf: 两层半：二楼未完工
+- SFoyer: 分层门厅
+- SLvl: 分层
+
+### 质量评级
+**OverallQual**: 房屋整体材料和装修等级
+- 10: 非常优秀
+- 9: 优秀
+- 8: 很好
+- 7: 好
+- 6: 高于平均
+- 5: 平均
+- 4: 低于平均
+- 3: 一般
+- 2: 差
+- 1: 很差
+
+**OverallCond**: 房屋整体状况等级
+- 10: 非常优秀
+- 9: 优秀
+- 8: 很好
+- 7: 好
+- 6: 高于平均
+- 5: 平均
+- 4: 低于平均
+- 3: 一般
+- 2: 差
+- 1: 很差
+
+### 时间信息
+**YearBuilt**: 原始建造日期
+**YearRemodAdd**: 改造日期（如果没有改造或加建，则与建造日期相同）
+
+### 屋顶信息
+**RoofStyle**: 屋顶类型
+- Flat: 平顶
+- Gable: 山墙
+- Gambrel: 谷仓式
+- Hip: 四坡顶
+- Mansard: 曼萨德
+- Shed: 棚顶
+
+**RoofMatl**: 屋顶材料
+- ClyTile: 粘土或瓦
+- CompShg: 标准（复合）瓦
+- Membran: 膜
+- Metal: 金属
+- Roll: 卷材
+- Tar&Grv: 砾石和沥青
+- WdShake: 木瓦
+- WdShngl: 木瓦
+
+### 外观信息
+**Exterior1st**: 房屋外观覆盖材料
+- AsbShng: 石棉瓦
+- AsphShn: 沥青瓦
+- BrkComm: 普通砖
+- BrkFace: 面砖
+- CBlock: 煤渣块
+- CemntBd: 水泥板
+- HdBoard: 硬板
+- ImStucc: 仿灰泥
+- MetalSd: 金属墙板
+- Other: 其他
+- Plywood: 胶合板
+- PreCast: 预制
+- Stone: 石头
+- Stucco: 灰泥
+- VinylSd: 乙烯基墙板
+- Wd Sdng: 木墙板
+- WdShing: 木瓦
+
+**Exterior2nd**: 房屋外观覆盖材料（如果有多种材料）
+- 与Exterior1st相同的选项
+
+**MasVnrType**: 砌体饰面类型
+- BrkCmn: 普通砖
+- BrkFace: 面砖
+- CBlock: 煤渣块
+- None: 无
+- Stone: 石头
+
+**MasVnrArea**: 砌体饰面面积（平方英尺）
+
+**ExterQual**: 评估外观材料质量
+- Ex: 优秀
+- Gd: 好
+- TA: 平均/典型
+- Fa: 一般
+- Po: 差
+
+**ExterCond**: 评估外观材料现状
+- Ex: 优秀
+- Gd: 好
+- TA: 平均/典型
+- Fa: 一般
+- Po: 差
+
+### 基础信息
+**Foundation**: 基础类型
+- BrkTil: 砖和瓦
+- CBlock: 煤渣块
+- PConc: 浇筑混凝土
+- Slab: 板
+- Stone: 石头
+- Wood: 木材
+
+### 地下室信息
+**BsmtQual**: 评估地下室高度
+- Ex: 优秀（100+英寸）
+- Gd: 好（90-99英寸）
+- TA: 典型（80-89英寸）
+- Fa: 一般（70-79英寸）
+- Po: 差（<70英寸）
+- NA: 无地下室
+
+**BsmtCond**: 评估地下室一般状况
+- Ex: 优秀
+- Gd: 好
+- TA: 典型 - 允许轻微潮湿
+- Fa: 一般 - 潮湿或一些开裂或沉降
+- Po: 差 - 严重开裂、沉降或潮湿
+- NA: 无地下室
+
+**BsmtExposure**: 指走出式或花园层墙
+- Gd: 良好暴露
+- Av: 平均暴露（分层或门厅通常得分平均或以上）
+- Mn: 最小暴露
+- No: 无暴露
+- NA: 无地下室
+
+**BsmtFinType1**: 地下室完工区域等级
+- GLQ: 良好生活区
+- ALQ: 平均生活区
+- BLQ: 低于平均生活区
+- Rec: 平均娱乐室
+- LwQ: 低质量
+- Unf: 未完工
+- NA: 无地下室
+
+**BsmtFinSF1**: 类型1完工平方英尺
+
+**BsmtFinType2**: 地下室完工区域等级（如果有多种类型）
+- 与BsmtFinType1相同的选项
+
+**BsmtFinSF2**: 类型2完工平方英尺
+**BsmtUnfSF**: 地下室未完工平方英尺
+**TotalBsmtSF**: 地下室总面积平方英尺
+
+### 供暖信息
+**Heating**: 供暖类型
+- Floor: 地板炉
+- GasA: 燃气强制热风炉
+- GasW: 燃气热水或蒸汽供暖
+- Grav: 重力炉
+- OthW: 燃气以外的热水或蒸汽供暖
+- Wall: 壁炉
+
+**HeatingQC**: 供暖质量和状况
+- Ex: 优秀
+- Gd: 好
+- TA: 平均/典型
+- Fa: 一般
+- Po: 差
+
+**CentralAir**: 中央空调
+- N: 否
+- Y: 是
+
+**Electrical**: 电气系统
+- SBrkr: 标准断路器和新罗马线
+- FuseA: 60安培以上保险丝盒和所有新罗马线（平均）
+- FuseF: 60安培保险丝盒和主要是新罗马线（一般）
+- FuseP: 60安培保险丝盒和主要是旋钮和管状布线（差）
+- Mix: 混合
+
+### 面积信息
+**1stFlrSF**: 一楼平方英尺
+**2ndFlrSF**: 二楼平方英尺
+**LowQualFinSF**: 低质量完工平方英尺（所有楼层）
+**GrLivArea**: 地面以上生活区平方英尺
+
+### 浴室信息
+**BsmtFullBath**: 地下室全浴室
+**BsmtHalfBath**: 地下室半浴室
+**FullBath**: 地面以上全浴室
+**HalfBath**: 地面以上半浴室
+
+### 房间信息
+**Bedroom**: 地面以上卧室（不包括地下室卧室）
+**Kitchen**: 地面以上厨房
+
+**KitchenQual**: 厨房质量
+- Ex: 优秀
+- Gd: 好
+- TA: 典型/平均
+- Fa: 一般
+- Po: 差
+
+**TotRmsAbvGrd**: 地面以上总房间数（不包括浴室）
+
+### 功能信息
+**Functional**: 房屋功能（除非有扣减，否则假设典型）
+- Typ: 典型功能
+- Min1: 轻微扣减1
+- Min2: 轻微扣减2
+- Mod: 中等扣减
+- Maj1: 主要扣减1
+- Maj2: 主要扣减2
+- Sev: 严重损坏
+- Sal: 仅可抢救
+
+### 壁炉信息
+**Fireplaces**: 壁炉数量
+
+**FireplaceQu**: 壁炉质量
+- Ex: 优秀 - 特殊砌体壁炉
+- Gd: 好 - 主层砌体壁炉
+- TA: 平均 - 主生活区预制壁炉或地下室砌体壁炉
+- Fa: 一般 - 地下室预制壁炉
+- Po: 差 - 本富兰克林炉
+- NA: 无壁炉
+
+### 车库信息
+**GarageType**: 车库位置
+- 2Types: 多种类型车库
+- Attchd: 附属于房屋
+- Basment: 地下室车库
+- BuiltIn: 内置（车库是房屋的一部分 - 通常车库上方有房间）
+- CarPort: 车棚
+- Detchd: 独立于房屋
+- NA: 无车库
+
+**GarageYrBlt**: 车库建造年份
+**GarageFinish**: 车库内部装修
+- Fin: 完工
+- RFn: 粗装修
+- Unf: 未完工
+- NA: 无车库
+
+**GarageCars**: 车库容量（车数）
+**GarageArea**: 车库面积（平方英尺）
+
+**GarageQual**: 车库质量
+- Ex: 优秀
+- Gd: 好
+- TA: 典型/平均
+- Fa: 一般
+- Po: 差
+- NA: 无车库
+
+**GarageCond**: 车库状况
+- Ex: 优秀
+- Gd: 好
+- TA: 典型/平均
+- Fa: 一般
+- Po: 差
+- NA: 无车库
+
+### 车道信息
+**PavedDrive**: 铺装车道
+- Y: 铺装
+- P: 部分铺装
+- N: 泥土/砾石
+
+### 户外空间信息
+**WoodDeckSF**: 木甲板面积（平方英尺）
+**OpenPorchSF**: 开放式门廊面积（平方英尺）
+**EnclosedPorch**: 封闭式门廊面积（平方英尺）
+**3SsnPorch**: 三季门廊面积（平方英尺）
+**ScreenPorch**: 纱门廊面积（平方英尺）
+
+### 游泳池信息
+**PoolArea**: 游泳池面积（平方英尺）
+
+**PoolQC**: 游泳池质量
+- Ex: 优秀
+- Gd: 好
+- TA: 平均/典型
+- Fa: 一般
+- NA: 无游泳池
+
+### 围栏信息
+**Fence**: 围栏质量
+- GdPrv: 良好隐私
+- MnPrv: 最小隐私
+- GdWo: 良好木材
+- MnWw: 最小木材/铁丝
+- NA: 无围栏
+
+### 其他设施信息
+**MiscFeature**: 其他类别未涵盖的杂项特征
+- Elev: 电梯
+- Gar2: 第二车库（如果车库部分未描述）
+- Othr: 其他
+- Shed: 棚屋（超过100平方英尺）
+- TenC: 网球场
+- NA: 无
+
+**MiscVal**: 杂项特征价值（美元）
+
+### 销售信息
+**MoSold**: 销售月份（MM）
+**YrSold**: 销售年份（YYYY）
+
+**SaleType**: 销售类型
+- WD: 保修契约 - 常规
+- CWD: 保修契约 - 现金
+- VWD: 保修契约 - VA贷款
+- New: 刚建造并销售的新房
+- COD: 法院官员契约/遗产
+- Con: 合同15%首付常规条款
+- ConLw: 合同低首付和低利率
+- ConLI: 合同低利率
+- ConLD: 合同低首付
+- Oth: 其他
+
+**SaleCondition**: 销售状况
+- Normal: 正常销售
+- Abnorml: 异常销售 - 交易、止赎、短售
+- AdjLand: 相邻土地购买
+- Alloca: 分配 - 两个相连物业有单独契约，通常是带车库单元的公寓
+- Family: 家庭成员间销售
+- Partial: 房屋在最后评估时未完工（与新房屋相关）
