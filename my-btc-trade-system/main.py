@@ -278,6 +278,103 @@ def print_trend_analysis(trend_results: Dict[str, Dict]) -> None:
         print(f"  20日均线: {data.get('ma20', 0):.4f}")
         print(f"  偏离20日均线: {data.get('distance_from_ma20', 0):.2f}%")
 
+def calculate_5day_high(klines: List[List]) -> float:
+    """计算5日最高价"""
+    if len(klines) < 120:  # 5天 * 24小时
+        return 0
+    
+    recent_5days = klines[-120:]
+    return max(float(kline[2]) for kline in recent_5days)
+
+def generate_add_position_signals(positions: Optional[List], klines_data: Dict[str, List]) -> Dict[str, List]:
+    """生成加仓信号"""
+    if not positions or not klines_data:
+        return {}
+    
+    signals = {}
+    
+    for pos in positions:
+        if float(pos.get('positionAmt', 0)) == 0:
+            continue
+            
+        symbol = pos.get('symbol', '')
+        if symbol not in klines_data:
+            continue
+            
+        entry_price = float(pos.get('entryPrice', 0))
+        current_price = float(klines_data[symbol][-1][4])  # 最新收盘价
+        high_5day = calculate_5day_high(klines_data[symbol])
+        
+        if entry_price == 0:
+            continue
+            
+        # 选择策略配置
+        if symbol == "BTCUSDT":
+            below_cost_strategy = BTC_ADD_POSITION_BELOW_COST
+            above_cost_strategy = BTC_ADD_POSITION_ABOVE_COST
+        else:
+            below_cost_strategy = OTHER_ADD_POSITION_BELOW_COST
+            above_cost_strategy = OTHER_ADD_POSITION_ABOVE_COST
+        
+        position_signals = []
+        
+        if current_price <= entry_price:
+            # 价格低于持仓成本
+            cost_diff_pct = ((current_price - entry_price) / entry_price) * 100
+            
+            for threshold, amount in below_cost_strategy:
+                if cost_diff_pct <= threshold:
+                    position_signals.append({
+                        'type': '成本加仓',
+                        'condition': f'相对成本{threshold}%',
+                        'amount': amount,
+                        'current_diff': cost_diff_pct,
+                        'triggered': True
+                    })
+                    break
+        else:
+            # 价格高于持仓成本
+            if high_5day > 0:
+                high_diff_pct = ((current_price - high_5day) / high_5day) * 100
+                
+                for threshold, amount in above_cost_strategy:
+                    if high_diff_pct <= threshold:
+                        position_signals.append({
+                            'type': '回调加仓',
+                            'condition': f'从5日高点回调{abs(threshold)}%',
+                            'amount': amount,
+                            'current_diff': high_diff_pct,
+                            'high_5day': high_5day,
+                            'triggered': True
+                        })
+                        break
+        
+        if position_signals:
+            signals[symbol] = position_signals
+    
+    return signals
+
+def print_add_position_signals(signals: Dict[str, List]) -> None:
+    """打印加仓信号"""
+    if not signals:
+        print("\n=== 加仓提示 ===")
+        print("当前无加仓信号")
+        return
+    
+    print("\n=== 加仓提示 ===")
+    
+    for symbol, signal_list in signals.items():
+        print(f"\n{symbol}:")
+        for signal in signal_list:
+            print(f"  类型: {signal['type']}")
+            print(f"  条件: {signal['condition']}")
+            print(f"  建议加仓: {signal['amount']}U")
+            if signal['type'] == '成本加仓':
+                print(f"  当前偏离成本: {signal['current_diff']:.2f}%")
+            else:
+                print(f"  当前回调幅度: {signal['current_diff']:.2f}%")
+                print(f"  5日高点: {signal['high_5day']:.4f}")
+
 def main() -> None:
     """主函数"""
     print("=== 币安交易风险提示系统 ===")
@@ -307,6 +404,10 @@ def main() -> None:
     
     positions = get_positions()
     print_positions(positions)
+    
+    # 生成加仓信号
+    add_signals = generate_add_position_signals(positions, all_data)
+    print_add_position_signals(add_signals)
 
 if __name__ == "__main__":
     main() 

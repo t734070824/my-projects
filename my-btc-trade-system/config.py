@@ -26,4 +26,31 @@ STRONG_DOWN_CHANGE = -12  # 弱势下降7日跌幅阈值
 STRONG_DOWN_CONSECUTIVE = 4  # 弱势下降连续收阴天数
 SIDEWAYS_RANGE = 8  # 横盘震荡范围
 RELATIVE_BTC_STRONG = 8  # 相对BTC强势阈值
-MA20_DISTANCE = 5  # 20日均线偏离阈值 
+MA20_DISTANCE = 5  # 20日均线偏离阈值
+
+# 加仓策略配置
+# BTC加仓策略
+BTC_ADD_POSITION_BELOW_COST = [
+    (-2, 200),  # 相对成本-2%：加仓200U
+    (-4, 400),  # 相对成本-4%：加仓400U
+    (-6, 600),  # 相对成本-6%：加仓600U
+]
+
+BTC_ADD_POSITION_ABOVE_COST = [
+    (-3, 150),  # 从5日高点回调3%：加仓150U
+    (-5, 300),  # 从5日高点回调5%：加仓300U
+    (-8, 500),  # 从5日高点回调8%：加仓500U
+]
+
+# 其他币种加仓策略
+OTHER_ADD_POSITION_BELOW_COST = [
+    (-3, 100),  # 相对成本-3%：加仓100U
+    (-6, 200),  # 相对成本-6%：加仓200U
+    (-9, 300),  # 相对成本-9%：加仓300U
+]
+
+OTHER_ADD_POSITION_ABOVE_COST = [
+    (-4, 80),   # 从5日高点回调4%：加仓80U
+    (-6, 150),  # 从5日高点回调6%：加仓150U
+    (-10, 250), # 从5日高点回调10%：加仓250U
+] 
