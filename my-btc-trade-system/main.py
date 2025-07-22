@@ -1133,7 +1133,7 @@ def run_analysis() -> None:
                 elif ENABLE_DINGTALK_NOTIFICATION:
                     print("❌ 钉钉通知发送失败")
             else:
-                print("⏭️ 相同信号已在30分钟内发送，跳过钉钉通知")
+                print("⏭️ 相同信号已在10分钟内发送，跳过钉钉通知")
                 
     except Exception as e:
         print(f"❌ 分析执行失败: {e}")
