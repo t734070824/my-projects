@@ -4,7 +4,7 @@ url = "https://api.github.com/search/repositories"
 url += "?q=language:python+sort:stars"
 
 headers = {"Accept": "application/vnd.github.v3+json"}
-r = requests.get(url, headers=headers)
+r = requests.get(url, headers=headers, verify=False)  # Disable SSL verification
 
 print(f"Status code: {r.status_code}")
 

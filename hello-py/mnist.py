@@ -1,6 +1,7 @@
 # coding: utf-8
 try:
     import urllib.request
+    import ssl
 except ImportError:
     raise ImportError('You should use Python 3.x')
 import os.path
@@ -37,8 +38,14 @@ def _download(file_name):
 
     print("Downloading " + file_name + " ... ")
     headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:47.0) Gecko/20100101 Firefox/47.0"}
+    
+    # Create SSL context to handle hostname verification
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    
     request = urllib.request.Request(url_base+file_name, headers=headers)
-    response = urllib.request.urlopen(request).read()
+    response = urllib.request.urlopen(request, context=ssl_context).read()
     with open(file_path, mode='wb') as f:
         f.write(response)
     print("Done")
