@@ -107,9 +107,9 @@ class BinanceDataFetcher:
                 for col in numeric_columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                 
-                # 转换时间戳
-                df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-                df['close_time'] = pd.to_datetime(df['close_time'], unit='ms')
+                # 转换时间戳并添加+8小时时区
+                df['open_time'] = pd.to_datetime(df['open_time'], unit='ms') + pd.Timedelta(hours=8)
+                df['close_time'] = pd.to_datetime(df['close_time'], unit='ms') + pd.Timedelta(hours=8)
                 
                 logger.info(f"成功获取 {len(df)} 条K线数据")
                 return df
@@ -183,9 +183,9 @@ class BinanceDataFetcher:
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             
-            # 转换时间戳
-            df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-            df['close_time'] = pd.to_datetime(df['close_time'], unit='ms')
+            # 转换时间戳并添加+8小时时区
+            df['open_time'] = pd.to_datetime(df['open_time'], unit='ms') + pd.Timedelta(hours=8)
+            df['close_time'] = pd.to_datetime(df['close_time'], unit='ms') + pd.Timedelta(hours=8)
             
             logger.info(f"备用方法成功获取 {len(df)} 条K线数据")
             return df
@@ -326,4 +326,4 @@ def main():
         logger.error("无法获取数据，系统退出")
 
 if __name__ == "__main__":
-    main()
+    main() 
