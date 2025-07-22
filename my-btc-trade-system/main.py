@@ -89,7 +89,7 @@ def get_positions():
         return None
     
     base_url = "https://fapi.binance.com"
-    endpoint = "/fapi/v2/positionRisk"
+    endpoint = "/fapi/v3/positionRisk"
     
     timestamp = int(time.time() * 1000)
     query_string = f"timestamp={timestamp}"
@@ -132,18 +132,35 @@ def print_positions(positions):
         
     for pos in active_positions:
         symbol = pos['symbol']
+        position_side = pos['positionSide']
         size = float(pos['positionAmt'])
         entry_price = float(pos['entryPrice'])
+        break_even_price = float(pos['breakEvenPrice'])
         mark_price = float(pos['markPrice'])
         pnl = float(pos['unRealizedProfit'])
+        liquidation_price = float(pos['liquidationPrice'])
+        isolated_margin = float(pos['isolatedMargin'])
+        notional = float(pos['notional'])
+        margin_asset = pos['marginAsset']
+        isolated_wallet = float(pos['isolatedWallet'])
+        initial_margin = float(pos['initialMargin'])
+        maint_margin = float(pos['maintMargin'])
+        position_initial_margin = float(pos['positionInitialMargin'])
+        open_order_initial_margin = float(pos['openOrderInitialMargin'])
+        adl = pos['adl']
+        bid_notional = float(pos['bidNotional'])
+        ask_notional = float(pos['askNotional'])
+        update_time = pos['updateTime']
+        
         side = "多头" if size > 0 else "空头"
         
-        print(f"\n{symbol}:")
+        print(f"\n{symbol} ({position_side}):")
         print(f"  方向: {side}")
-        print(f"  仓位: {abs(size):.4f}")
-        print(f"  开仓价: {entry_price:.4f}")
-        print(f"  标记价: {mark_price:.4f}")
-        print(f"  未实现盈亏: {pnl:.4f} USDT")
+        print(f"  开仓价: {entry_price:.6f}")
+        print(f"  未实现盈亏: {pnl:.4f} {margin_asset}")
+        print(f"  强平价: {liquidation_price:.6f}" if liquidation_price > 0 else "  强平价: 无")
+        print(f"  仓位初始保证金: {position_initial_margin:.4f} {margin_asset}")
+        print(f"  更新时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(update_time/1000))}")
 
 def calculate_trend_indicators(klines_data):
     """计算趋势识别指标"""
