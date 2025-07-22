@@ -1,0 +1,15 @@
+2025-07-22 13:52:18,598 - __main__ - INFO - === BTC交易风险提示系统启动 ===
+2025-07-22 13:52:18,599 - __main__ - INFO - 正在获取 BTCUSDT 1h K线数据，第 1 次尝试
+2025-07-22 13:52:18,769 - __main__ - ERROR - 网络请求失败 (尝试 1/3): HTTPSConnectionPool(host='data-api.binance.vision', port=443): Max retries exceeded with url: /api/v3/klines?symbol=BTCUSDT&interval=1h&limit=100 (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)'))))
+2025-07-22 13:52:19,782 - __main__ - INFO - 正在获取 BTCUSDT 1h K线数据，第 2 次尝试
+2025-07-22 13:52:19,968 - __main__ - ERROR - 网络请求失败 (尝试 2/3): HTTPSConnectionPool(host='data-api.binance.vision', port=443): Max retries exceeded with url: /api/v3/klines?symbol=BTCUSDT&interval=1h&limit=100 (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)'))))
+2025-07-22 13:52:20,971 - __main__ - INFO - 正在获取 BTCUSDT 1h K线数据，第 3 次尝试
+2025-07-22 13:52:21,171 - __main__ - ERROR - 网络请求失败 (尝试 3/3): HTTPSConnectionPool(host='data-api.binance.vision', port=443): Max retries exceeded with url: /api/v3/klines?symbol=BTCUSDT&interval=1h&limit=100 (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)'))))
+2025-07-22 13:52:21,171 - __main__ - ERROR - 所有重试都失败了
+2025-07-22 13:52:21,172 - __main__ - ERROR - 无法获取数据，系统退出
+2025-07-22 13:58:53,424 - __main__ - INFO - === BTC交易风险提示系统启动 ===
+2025-07-22 13:58:53,425 - __main__ - INFO - 正在获取 BTCUSDT 1h K线数据，第 1 次尝试
+2025-07-22 13:58:53,901 - __main__ - INFO - 成功获取 100 条K线数据
+2025-07-22 13:59:41,792 - __main__ - INFO - === BTC交易风险提示系统启动 ===
+2025-07-22 13:59:41,793 - __main__ - INFO - 正在获取 BTCUSDT 1h K线数据，第 1 次尝试
+2025-07-22 13:59:42,348 - __main__ - INFO - 成功获取 100 条K线数据
