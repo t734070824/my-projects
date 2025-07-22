@@ -3,9 +3,20 @@ import json
 import time
 import hmac
 import hashlib
+import schedule
 from typing import Dict, List, Optional, Any
 from config import *
 from api_keys import API_KEY, SECRET_KEY
+
+# 尝试导入钉钉配置，如果不存在则使用默认配置
+try:
+    from dingtalk_config import DINGTALK_WEBHOOK_URL, ENABLE_DINGTALK_NOTIFICATION
+except ImportError:
+    # 如果没有dingtalk_config.py文件，使用config.py中的默认配置
+    pass
+
+# 全局变量：存储最近发送的通知记录
+_notification_history = {}
 
 def calculate_change_and_amplitude(klines: List[List]) -> List[List]:
     """计算每条数据的涨跌和振幅，并将结果添加到klines中"""
@@ -132,6 +143,14 @@ def print_account_info(account_info: Optional[Dict]) -> None:
         value = float(account_info.get(key, 0))
         print(f"{label}: {value:.4f} USDT")
     
+    # 计算并显示未实现盈亏占比
+    total_wallet = float(account_info.get('totalWalletBalance', 0))
+    total_pnl = float(account_info.get('totalUnrealizedProfit', 0))
+    
+    if total_wallet > 0:
+        pnl_ratio = (total_pnl / total_wallet) * 100
+        print(f"盈亏占比: {pnl_ratio:.2f}% ({total_pnl:.4f}/{total_wallet:.4f}*100)")
+    
     # 计算并显示保证金使用率
     margin_ratio = calculate_margin_ratio(account_info)
     margin_level = get_margin_level(margin_ratio)
@@ -146,7 +165,6 @@ def print_account_info(account_info: Optional[Dict]) -> None:
     
     # 计算已使用保证金
     used_margin = float(account_info.get('totalInitialMargin', 0))
-    total_wallet = float(account_info.get('totalWalletBalance', 0))
     available_balance = float(account_info.get('availableBalance', 0))
     
     print(f"已使用保证金: {used_margin:.4f} USDT (来源: totalInitialMargin)")
@@ -621,6 +639,139 @@ def analyze_no_signal_reasons(positions: Optional[List], klines_data: Dict[str, 
         
         print(f"  当前状态: 成本{entry_price:.4f} 现价{current_price:.4f} 趋势{trend}")
 
+def generate_signal_hash(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> str:
+    """生成信号的唯一标识哈希值"""
+    signal_data = []
+    
+    # 减仓信号
+    for symbol, signal_list in reduce_signals.items():
+        for signal in signal_list:
+            signal_key = f"{symbol}_{signal['type']}_{signal.get('percentage', 0)}"
+            signal_data.append(signal_key)
+    
+    # 加仓信号
+    for symbol, signal_list in add_signals.items():
+        for signal in signal_list:
+            signal_key = f"{symbol}_{signal['type']}_{signal.get('amount', 0)}_{signal.get('position_side', '')}"
+            signal_data.append(signal_key)
+    
+    # 生成哈希
+    signal_str = "_".join(sorted(signal_data))
+    return str(hash(signal_str))
+
+def should_send_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> bool:
+    """检查是否应该发送通知（10分钟内不重复发送相同内容）"""
+    global _notification_history
+    
+    if not reduce_signals and not add_signals:
+        return False
+    
+    # 生成当前信号的哈希值
+    current_hash = generate_signal_hash(reduce_signals, add_signals)
+    current_time = time.time()
+    
+    # 清理10分钟前的记录
+    cutoff_time = current_time - 600  # 10分钟 = 600秒
+    _notification_history = {k: v for k, v in _notification_history.items() if v > cutoff_time}
+    
+    # 检查是否已发送过相同内容
+    if current_hash in _notification_history:
+        last_sent_time = _notification_history[current_hash]
+        time_diff = (current_time - last_sent_time) / 60  # 转换为分钟
+        print(f"相同信号在{time_diff:.1f}分钟前已发送，跳过钉钉通知")
+        return False
+    
+    # 记录本次发送
+    _notification_history[current_hash] = current_time
+    return True
+
+def send_dingtalk_notification(message: str) -> bool:
+    """发送钉钉机器人通知"""
+    if not ENABLE_DINGTALK_NOTIFICATION or not DINGTALK_WEBHOOK_URL:
+        return False
+    
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "msgtype": "text",
+        "text": {
+            "content": message
+        }
+    }
+    
+    try:
+        response = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=data, timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"钉钉通知发送失败: {e}")
+        return False
+
+def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> str:
+    """格式化信号为钉钉通知消息"""
+    messages = []
+    messages.append("🚨 币安交易提醒 🚨")
+    messages.append(f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    messages.append("")
+    
+    # 减仓信号
+    if reduce_signals:
+        messages.append("📉 减仓提示:")
+        for symbol, signal_list in reduce_signals.items():
+            for signal in signal_list:
+                if symbol == 'SYSTEM':
+                    messages.append(f"🔔 系统级: {signal['condition']}")
+                    messages.append(f"   建议减仓: {signal['percentage']}%")
+                else:
+                    messages.append(f"🔸 {symbol}: {signal['condition']}")
+                    messages.append(f"   建议减仓: {signal['percentage']}%")
+        messages.append("")
+    
+    # 加仓信号
+    if add_signals:
+        messages.append("📈 加仓提示:")
+        for symbol, signal_list in add_signals.items():
+            for signal in signal_list:
+                side_names = {'LONG': '多头', 'SHORT': '空头', 'BOTH': '双向'}
+                side_name = side_names.get(signal.get('position_side', ''), '未知')
+                messages.append(f"🔸 {symbol} ({side_name}): {signal['condition']}")
+                messages.append(f"   建议加仓: {signal['amount']}U")
+        messages.append("")
+    
+    if not reduce_signals and not add_signals:
+        messages.append("✅ 当前无操作信号")
+        messages.append("持续监控中...")
+    
+    return "\n".join(messages)
+
+def check_pnl_ratio_reduce_signals(account_info: Optional[Dict]) -> Dict[str, List]:
+    """检查基于未实现盈亏占比的减仓信号"""
+    if not account_info:
+        return {}
+    
+    total_wallet = float(account_info.get('totalWalletBalance', 0))
+    total_pnl = float(account_info.get('totalUnrealizedProfit', 0))
+    
+    if total_wallet == 0 or total_pnl <= 0:
+        return {}
+    
+    pnl_ratio = (total_pnl / total_wallet) * 100
+    
+    signals = {}
+    
+    for threshold, percentage in PNL_RATIO_REDUCE_STRATEGY:
+        if pnl_ratio >= threshold:
+            signals['SYSTEM'] = [{
+                'type': '盈亏比例减仓',
+                'condition': f'未实现盈亏{total_pnl:.2f}U占总余额{total_wallet:.2f}U的{pnl_ratio:.2f}% >= {threshold}%',
+                'percentage': percentage,
+                'pnl_ratio': pnl_ratio,
+                'total_pnl': total_pnl,
+                'total_wallet': total_wallet,
+                'triggered': True
+            }]
+            break
+    
+    return signals
+
 def generate_reduce_position_signals(positions: Optional[List], klines_data: Dict[str, List], trend_results: Dict[str, Dict], account_info: Optional[Dict]) -> Dict[str, List]:
     """生成减仓信号"""
     if not positions or not klines_data:
@@ -744,8 +895,8 @@ def generate_add_position_signals(positions: Optional[List], klines_data: Dict[s
                 above_cost_strategy = BTC_ADD_POSITION_ABOVE_COST
                 use_7day_high = False
             else:
-            below_cost_strategy = BTC_ADD_POSITION_BELOW_COST
-            above_cost_strategy = BTC_ADD_POSITION_ABOVE_COST
+                below_cost_strategy = BTC_ADD_POSITION_BELOW_COST
+                above_cost_strategy = BTC_ADD_POSITION_ABOVE_COST
                 use_7day_high = False
         elif symbol == "ETHUSDT":
             if trend == "强势上升":
@@ -906,53 +1057,114 @@ def print_add_position_signals(signals: Dict[str, List]) -> None:
             print(f"  条件: {signal['condition']}")
             print(f"  建议加仓: {signal['amount']}U")
 
+def run_analysis() -> None:
+    """执行一次完整的分析"""
+    print(f"\n{'='*50}")
+    print(f"开始分析 - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*50}")
+    
+    try:
+        # 获取K线数据
+        all_data = get_multiple_symbols_data()
+        if not all_data:
+            print("无法获取K线数据")
+            return
+        
+        # 显示K线数据概览
+        for symbol, klines in all_data.items():
+            if klines:
+                print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
+                print("最后5条数据的涨跌和振幅:")
+                for kline in klines[-5:]:
+                    if len(kline) >= 15:  # 确保有扩展数据
+                        print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
+        
+        # 趋势识别分析
+        trend_results = calculate_trend_indicators(all_data)
+        print_trend_analysis(trend_results)
+        
+        # 获取账户信息和持仓
+        account_info = get_account_info()
+        print_account_info(account_info)
+        
+        positions = get_positions()
+        print_positions(positions)
+        
+        # 检查硬性风控红线
+        risk_warnings = check_risk_control(positions, account_info)
+        print_risk_warnings(risk_warnings)
+        
+        # 显示今日操作频率
+        print_operation_frequency(positions)
+        
+        # 检查未实现盈亏占比减仓信号
+        pnl_ratio_signals = check_pnl_ratio_reduce_signals(account_info)
+        
+        # 生成减仓信号
+        reduce_signals = generate_reduce_position_signals(positions, all_data, trend_results, account_info)
+        
+        # 合并盈亏比例减仓信号
+        if pnl_ratio_signals:
+            reduce_signals.update(pnl_ratio_signals)
+        
+        print_reduce_position_signals(reduce_signals)
+        
+        # 生成加仓信号（排除已有减仓信号的产品）
+        add_signals = generate_add_position_signals(positions, all_data, trend_results, account_info, reduce_signals)
+        print_add_position_signals(add_signals)
+        
+        # 分析没有操作信号的原因
+        analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
+        
+        # 生成并打印钉钉通知内容
+        if reduce_signals or add_signals:
+            notification_message = format_signals_for_notification(reduce_signals, add_signals)
+            print("\n" + "="*60)
+            print("📱 钉钉通知内容:")
+            print("="*60)
+            print(notification_message)
+            print("="*60)
+            
+            # 检查是否应该发送
+            if should_send_notification(reduce_signals, add_signals):
+                success = send_dingtalk_notification(notification_message)
+                if success:
+                    print("✅ 钉钉通知发送成功")
+                elif ENABLE_DINGTALK_NOTIFICATION:
+                    print("❌ 钉钉通知发送失败")
+            else:
+                print("⏭️ 相同信号已在30分钟内发送，跳过钉钉通知")
+                
+    except Exception as e:
+        print(f"❌ 分析执行失败: {e}")
+        # 发送错误通知
+        error_message = f"🚨 币安交易系统错误 🚨\n时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n错误信息: {str(e)}"
+        send_dingtalk_notification(error_message)
+    
+    print(f"\n分析完成 - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
 def main() -> None:
-    """主函数"""
+    """主函数 - 设置定时任务"""
     print("=== 币安交易风险提示系统 ===")
+    print("系统启动，每分钟执行一次分析...")
     
-    # 获取K线数据
-    all_data = get_multiple_symbols_data()
-    if not all_data:
-        print("无法获取K线数据")
-        return
+    # 立即执行一次
+    run_analysis()
     
-    # 显示K线数据概览
-    for symbol, klines in all_data.items():
-        if klines:
-            print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
-            print("最后5条数据的涨跌和振幅:")
-            for kline in klines[-5:]:
-                if len(kline) >= 15:  # 确保有扩展数据
-                    print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
+    # 设置定时任务：每分钟执行一次
+    schedule.every().minute.do(run_analysis)
     
-    # 趋势识别分析
-    trend_results = calculate_trend_indicators(all_data)
-    print_trend_analysis(trend_results)
-    
-    # 获取账户信息和持仓
-    account_info = get_account_info()
-    print_account_info(account_info)
-    
-    positions = get_positions()
-    print_positions(positions)
-    
-    # 检查硬性风控红线
-    risk_warnings = check_risk_control(positions, account_info)
-    print_risk_warnings(risk_warnings)
-    
-    # 显示今日操作频率
-    print_operation_frequency(positions)
-    
-    # 生成减仓信号
-    reduce_signals = generate_reduce_position_signals(positions, all_data, trend_results, account_info)
-    print_reduce_position_signals(reduce_signals)
-    
-    # 生成加仓信号（排除已有减仓信号的产品）
-    add_signals = generate_add_position_signals(positions, all_data, trend_results, account_info, reduce_signals)
-    print_add_position_signals(add_signals)
-    
-    # 分析没有操作信号的原因
-    analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
+    # 保持程序运行
+    while True:
+        try:
+            schedule.run_pending()
+            time.sleep(1)  # 每秒检查一次
+        except KeyboardInterrupt:
+            print("\n\n系统停止运行")
+            break
+        except Exception as e:
+            print(f"定时任务执行出错: {e}")
+            time.sleep(60)  # 出错后等待1分钟再继续
 
 if __name__ == "__main__":
     main() 

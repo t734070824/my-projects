@@ -155,4 +155,15 @@ MAX_CONSECUTIVE_REDUCE = 4         # 连续减仓不超过4次
 # 强制平仓条件
 FORCE_CLOSE_MARGIN_RATIO = 85    # 保证金使用率达到85%
 FORCE_CLOSE_SINGLE_LOSS = 15     # 单币种亏损超过总资产15%
-FORCE_CLOSE_TOTAL_LOSS = 30      # 账户总亏损超过30% 
+FORCE_CLOSE_TOTAL_LOSS = 30      # 账户总亏损超过30%
+
+# 未实现盈亏占总余额比例减仓策略（积极型）
+PNL_RATIO_REDUCE_STRATEGY = [
+    (12, 25),  # 未实现盈亏占总余额 >= 12%：减仓25%
+    (20, 50),  # 未实现盈亏占总余额 >= 20%：减仓50%
+    (30, 75),  # 未实现盈亏占总余额 >= 30%：减仓75%
+]
+
+# 钉钉机器人配置
+DINGTALK_WEBHOOK_URL = ""  # 钉钉机器人Webhook地址，需要配置
+ENABLE_DINGTALK_NOTIFICATION = False  # 是否启用钉钉通知 
