@@ -3,154 +3,127 @@ import json
 import time
 import hmac
 import hashlib
-from urllib.parse import urlencode
-from config import BINANCE_API_URL, SYMBOLS, INTERVAL, TIMEZONE, USE_PROXY
+from typing import Dict, List, Optional, Any
+from config import *
 from api_keys import API_KEY, SECRET_KEY
 
-def calculate_change_and_amplitude(klines):
+def calculate_change_and_amplitude(klines: List[List]) -> List[List]:
     """计算每条数据的涨跌和振幅，并将结果添加到klines中"""
     if len(klines) < 2:
         return klines
     
     for i in range(1, len(klines)):
-        current = klines[i]
-        previous = klines[i-1]
+        current, previous = klines[i], klines[i-1]
         
-        # 解析数据
-        current_close = float(current[4])  # 当前收盘价
-        previous_close = float(previous[4])  # 前一条收盘价
-        current_high = float(current[2])   # 当前最高价
-        current_low = float(current[3])    # 当前最低价
+        # 解析价格数据
+        current_close, previous_close = float(current[4]), float(previous[4])
+        current_high, current_low = float(current[2]), float(current[3])
         
-        # 计算涨跌
+        # 计算指标
         change = current_close - previous_close
         change_percent = (change / previous_close) * 100
-        
-        # 计算振幅
         amplitude = ((current_high - current_low) / previous_close) * 100
         
-        # 将计算结果添加到klines中
+        # 添加计算结果
         current.extend([change, change_percent, amplitude])
     
     return klines
 
-def get_binance_klines(symbol):
-    """从币安获取指定symbol的K线数据"""
-    url = f"{BINANCE_API_URL}?symbol={symbol}&interval={INTERVAL}&timeZone={TIMEZONE}"
-    
+def make_api_request(endpoint: str, params: Optional[Dict] = None, auth_required: bool = False) -> Optional[Dict]:
+    """统一的API请求函数"""
+    url = f"{BINANCE_BASE_URL}{endpoint}"
+    headers = {}
     proxies = None if USE_PROXY else {'http': None, 'https': None}
-    response = requests.get(url, proxies=proxies)
-    response.raise_for_status()
-    data = response.json()
-    return data
+    
+    try:
+        if auth_required:
+            if not all([API_KEY, SECRET_KEY]):
+                print("请先配置API_KEY和SECRET_KEY")
+                return None
+            
+            timestamp = int(time.time() * 1000)
+            query_params = params or {}
+            query_params['timestamp'] = timestamp
+            
+            query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
+            signature = hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+            
+            url = f"{url}?{query_string}&signature={signature}"
+            headers['X-MBX-APIKEY'] = API_KEY
+        else:
+            if params:
+                query_string = '&'.join([f"{k}={v}" for k, v in params.items()])
+                url = f"{url}?{query_string}"
+        
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"API请求失败: {e}")
+        return None
 
-def get_multiple_symbols_data():
+def get_binance_klines(symbol: str) -> Optional[List]:
+    """从币安获取指定symbol的K线数据"""
+    params = {'symbol': symbol, 'interval': INTERVAL, 'timeZone': TIMEZONE}
+    return make_api_request(BINANCE_KLINES_ENDPOINT, params)
+
+def get_multiple_symbols_data() -> Dict[str, List]:
     """获取多个symbol的K线数据"""
-    all_data = {}
+    result = {}
     for symbol in SYMBOLS:
         klines = get_binance_klines(symbol)
-        klines_with_indicators = calculate_change_and_amplitude(klines)
-        all_data[symbol] = klines_with_indicators
-    return all_data
+        if klines:
+            result[symbol] = calculate_change_and_amplitude(klines)
+    return result
 
-def create_signature(query_string):
-    """创建币安API签名"""
-    return hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-
-def get_account_info():
+def get_account_info() -> Optional[Dict]:
     """获取账户基本信息"""
-    if not API_KEY or not SECRET_KEY:
-        print("请先配置API_KEY和SECRET_KEY")
-        return None
-    
-    base_url = "https://fapi.binance.com"
-    endpoint = "/fapi/v2/account"
-    
-    timestamp = int(time.time() * 1000)
-    query_string = f"timestamp={timestamp}"
-    signature = create_signature(query_string)
-    
-    url = f"{base_url}{endpoint}?{query_string}&signature={signature}"
-    
-    headers = {
-        'X-MBX-APIKEY': API_KEY
-    }
-    
-    proxies = None if USE_PROXY else {'http': None, 'https': None}
-    response = requests.get(url, headers=headers, proxies=proxies)
-    response.raise_for_status()
-    
-    return response.json()
+    return make_api_request(BINANCE_ACCOUNT_ENDPOINT, auth_required=True)
 
-def get_positions():
+def get_positions() -> Optional[List]:
     """获取合约持仓信息"""
-    if not API_KEY or not SECRET_KEY:
-        print("请先配置API_KEY和SECRET_KEY")
-        return None
-    
-    base_url = "https://fapi.binance.com"
-    endpoint = "/fapi/v3/positionRisk"
-    
-    timestamp = int(time.time() * 1000)
-    query_string = f"timestamp={timestamp}"
-    signature = create_signature(query_string)
-    
-    url = f"{base_url}{endpoint}?{query_string}&signature={signature}"
-    
-    headers = {
-        'X-MBX-APIKEY': API_KEY
-    }
-    
-    proxies = None if USE_PROXY else {'http': None, 'https': None}
-    response = requests.get(url, headers=headers, proxies=proxies)
-    response.raise_for_status()
-    
-    return response.json()
+    return make_api_request(BINANCE_POSITION_ENDPOINT, auth_required=True)
 
-def print_account_info(account_info):
+def print_account_info(account_info: Optional[Dict]) -> None:
     """打印账户信息"""
     if not account_info:
         return
         
     print("\n=== 账户基本信息 ===")
-    print(f"总余额: {float(account_info['totalWalletBalance']):.4f} USDT")
-    print(f"可用余额: {float(account_info['availableBalance']):.4f} USDT")
-    print(f"未实现盈亏: {float(account_info['totalUnrealizedProfit']):.4f} USDT")
-    print(f"保证金余额: {float(account_info['totalMarginBalance']):.4f} USDT")
+    fields = [
+        ('总余额', 'totalWalletBalance'),
+        ('可用余额', 'availableBalance'),
+        ('未实现盈亏', 'totalUnrealizedProfit'),
+        ('保证金余额', 'totalMarginBalance')
+    ]
+    
+    for label, key in fields:
+        value = float(account_info.get(key, 0))
+        print(f"{label}: {value:.4f} USDT")
 
-def print_positions(positions):
+def print_positions(positions: Optional[List]) -> None:
     """打印持仓信息"""
     if not positions:
         return
         
     print("\n=== 合约持仓信息 ===")
-    active_positions = [pos for pos in positions if float(pos['positionAmt']) != 0]
+    active_positions = [pos for pos in positions if float(pos.get('positionAmt', 0)) != 0]
     
     if not active_positions:
         print("当前无持仓")
         return
         
     for pos in active_positions:
-        symbol = pos['symbol']
-        position_side = pos['positionSide']
-        size = float(pos['positionAmt'])
-        entry_price = float(pos['entryPrice'])
-        break_even_price = float(pos['breakEvenPrice'])
-        mark_price = float(pos['markPrice'])
-        pnl = float(pos['unRealizedProfit'])
-        liquidation_price = float(pos['liquidationPrice'])
-        isolated_margin = float(pos['isolatedMargin'])
-        notional = float(pos['notional'])
-        margin_asset = pos['marginAsset']
-        isolated_wallet = float(pos['isolatedWallet'])
-        initial_margin = float(pos['initialMargin'])
-        maint_margin = float(pos['maintMargin'])
-        position_initial_margin = float(pos['positionInitialMargin'])
-        open_order_initial_margin = float(pos['openOrderInitialMargin'])
-        adl = pos['adl']
-        bid_notional = float(pos['bidNotional'])
-        ask_notional = float(pos['askNotional'])
-        update_time = pos['updateTime']
+        # 提取关键信息
+        symbol = pos.get('symbol', '')
+        position_side = pos.get('positionSide', '')
+        size = float(pos.get('positionAmt', 0))
+        entry_price = float(pos.get('entryPrice', 0))
+        pnl = float(pos.get('unRealizedProfit', 0))
+        liquidation_price = float(pos.get('liquidationPrice', 0))
+        position_initial_margin = float(pos.get('positionInitialMargin', 0))
+        margin_asset = pos.get('marginAsset', 'USDT')
+        update_time = pos.get('updateTime', 0)
         
         side = "多头" if size > 0 else "空头"
         
@@ -162,7 +135,7 @@ def print_positions(positions):
         print(f"  仓位初始保证金: {position_initial_margin:.4f} {margin_asset}")
         print(f"  更新时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(update_time/1000))}")
 
-def calculate_trend_indicators(klines_data):
+def calculate_trend_indicators(klines_data: Dict[str, List]) -> Dict[str, Dict]:
     """计算趋势识别指标"""
     trend_results = {}
     
@@ -171,8 +144,7 @@ def calculate_trend_indicators(klines_data):
     if "BTCUSDT" in klines_data:
         btc_klines = klines_data["BTCUSDT"]
         if len(btc_klines) >= 168:
-            btc_start_price = float(btc_klines[-168][4])
-            btc_end_price = float(btc_klines[-1][4])
+            btc_start_price, btc_end_price = float(btc_klines[-168][4]), float(btc_klines[-1][4])
             btc_change_7d = ((btc_end_price - btc_start_price) / btc_start_price) * 100
     
     for symbol, klines in klines_data.items():
@@ -247,41 +219,25 @@ def calculate_trend_indicators(klines_data):
         # 趋势判断
         trend = "未知"
         
-        # 强势上升趋势（增加相对BTC强势条件）
-        if (change_7d > 15 and 
-            consecutive_green >= 5 and
-            (symbol == "BTCUSDT" or relative_to_btc > 8)):
+        # 趋势判断 - 使用配置中的阈值
+        if (change_7d > STRONG_UP_CHANGE and 
+            consecutive_green >= STRONG_UP_CONSECUTIVE and
+            (symbol == "BTCUSDT" or relative_to_btc > RELATIVE_BTC_STRONG)):
             trend = "强势上升"
-            
-        # 弱势下降趋势  
-        elif (change_7d < -12 and 
-              consecutive_red >= 4):
+        elif (change_7d < STRONG_DOWN_CHANGE and 
+              consecutive_red >= STRONG_DOWN_CONSECUTIVE):
             trend = "弱势下降"
-            
-        # 横盘震荡
-        elif (-8 <= change_7d <= 8 and 
-              abs(distance_from_ma20) <= 5):
+        elif (-SIDEWAYS_RANGE <= change_7d <= SIDEWAYS_RANGE and 
+              abs(distance_from_ma20) <= MA20_DISTANCE):
             trend = "横盘震荡"
-            
-        # 温和上升趋势
-        elif (8 < change_7d <= 15):
+        elif (SIDEWAYS_RANGE < change_7d <= STRONG_UP_CHANGE):
             trend = "温和上升"
-            
-        # 温和下降趋势
-        elif (-12 <= change_7d < -8):
+        elif (STRONG_DOWN_CHANGE <= change_7d < -SIDEWAYS_RANGE):
             trend = "温和下降"
-            
-        # 高位调整
-        elif (change_7d > 8 and 
-              distance_from_ma20 < -5):
+        elif (change_7d > SIDEWAYS_RANGE and distance_from_ma20 < -MA20_DISTANCE):
             trend = "高位调整"
-            
-        # 低位反弹
-        elif (change_7d < -8 and 
-              distance_from_ma20 > 5):
+        elif (change_7d < -SIDEWAYS_RANGE and distance_from_ma20 > MA20_DISTANCE):
             trend = "低位反弹"
-            
-        # 其他情况
         else:
             trend = "盘整待变"
             
@@ -298,31 +254,48 @@ def calculate_trend_indicators(klines_data):
     
     return trend_results
 
-def print_trend_analysis(trend_results):
+def print_trend_analysis(trend_results: Dict[str, Dict]) -> None:
     """打印趋势分析结果"""
+    if not trend_results:
+        print("无趋势分析数据")
+        return
+        
     print("\n=== 趋势识别分析 ===")
     
     for symbol, data in trend_results.items():
         print(f"\n{symbol}:")
-        print(f"  趋势: {data['trend']}")
-        print(f"  7日涨跌幅: {data['change_7d']:.2f}%")
+        print(f"  趋势: {data.get('trend', '未知')}")
+        print(f"  7日涨跌幅: {data.get('change_7d', 0):.2f}%")
+        
         if symbol != "BTCUSDT":
-            relative_status = "强势" if data['relative_to_btc'] > 0 else "弱势"
-            print(f"  相对BTC: {relative_status} {data['relative_to_btc']:.2f}%")
-        print(f"  连续收阳: {data['consecutive_green']}天")
-        print(f"  连续收阴: {data['consecutive_red']}天")
-        print(f"  当前价格: {data['current_price']:.4f}")
-        print(f"  20日均线: {data['ma20']:.4f}")
-        print(f"  偏离20日均线: {data['distance_from_ma20']:.2f}%")
+            relative_to_btc = data.get('relative_to_btc', 0)
+            relative_status = "强势" if relative_to_btc > 0 else "弱势"
+            print(f"  相对BTC: {relative_status} {relative_to_btc:.2f}%")
+            
+        print(f"  连续收阳: {data.get('consecutive_green', 0)}天")
+        print(f"  连续收阴: {data.get('consecutive_red', 0)}天")
+        print(f"  当前价格: {data.get('current_price', 0):.4f}")
+        print(f"  20日均线: {data.get('ma20', 0):.4f}")
+        print(f"  偏离20日均线: {data.get('distance_from_ma20', 0):.2f}%")
 
-if __name__ == "__main__":
-    all_data = get_multiple_symbols_data()
+def main() -> None:
+    """主函数"""
+    print("=== 币安交易风险提示系统 ===")
     
+    # 获取K线数据
+    all_data = get_multiple_symbols_data()
+    if not all_data:
+        print("无法获取K线数据")
+        return
+    
+    # 显示K线数据概览
     for symbol, klines in all_data.items():
-        print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
-        print(f"最后5条数据的涨跌和振幅:")
-        for kline in klines[-5:]:
-            print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
+        if klines:
+            print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
+            print("最后5条数据的涨跌和振幅:")
+            for kline in klines[-5:]:
+                if len(kline) >= 15:  # 确保有扩展数据
+                    print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
     
     # 趋势识别分析
     trend_results = calculate_trend_indicators(all_data)
@@ -333,4 +306,7 @@ if __name__ == "__main__":
     print_account_info(account_info)
     
     positions = get_positions()
-    print_positions(positions) 
+    print_positions(positions)
+
+if __name__ == "__main__":
+    main() 
