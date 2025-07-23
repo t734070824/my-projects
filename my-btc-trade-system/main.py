@@ -5,6 +5,11 @@ import hmac
 import hashlib
 import schedule
 import os
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
+import base64
+import io
 from typing import Dict, List, Optional, Any, Tuple
 from config import *
 from api_keys import API_KEY, SECRET_KEY
@@ -117,6 +122,75 @@ def generate_pnl_chart_data() -> List[Tuple[str, float]]:
     
     return chart_data
 
+def generate_pnl_chart_image() -> Optional[str]:
+    """生成盈亏走势图片并返回base64编码"""
+    try:
+        history = load_pnl_history()
+        
+        if not history:
+            return None
+        
+        # 取最近100个数据点
+        recent_history = history[-100:] if len(history) > 100 else history
+        
+        # 准备数据
+        times = []
+        pnl_values = []
+        
+        for record in recent_history:
+            times.append(datetime.strptime(record['datetime'], '%Y-%m-%d %H:%M:%S'))
+            pnl_values.append(record['pnl'])
+        
+        # 设置中文字体（如果需要）
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # 绘制折线图
+        ax.plot(times, pnl_values, color='#1f77b4', linewidth=2, marker='o', markersize=3)
+        
+        # 设置标题和标签
+        ax.set_title('盈亏走势图', fontsize=16, fontweight='bold')
+        ax.set_xlabel('时间', fontsize=12)
+        ax.set_ylabel('盈亏 (USDT)', fontsize=12)
+        
+        # 格式化x轴时间显示
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+        plt.xticks(rotation=45)
+        
+        # 添加网格
+        ax.grid(True, alpha=0.3)
+        
+        # 设置背景色
+        ax.set_facecolor('#f8f9fa')
+        
+        # 添加零线
+        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
+        
+        # 调整布局
+        plt.tight_layout()
+        
+        # 保存为字节流
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+        img_buffer.seek(0)
+        
+        # 转换为base64
+        img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+        
+        # 清理资源
+        plt.close(fig)
+        img_buffer.close()
+        
+        return img_base64
+        
+    except Exception as e:
+        print(f"生成盈亏图片失败: {e}")
+        return None
+
 def format_pnl_chart(chart_data: List[Tuple[str, float]]) -> str:
     """格式化盈亏图表为文本"""
     if not chart_data:
@@ -129,33 +203,61 @@ def format_pnl_chart(chart_data: List[Tuple[str, float]]) -> str:
     range_pnl = max_pnl - min_pnl if max_pnl != min_pnl else 1
     
     # 图表高度和宽度
-    height = 10
-    width = min(50, len(chart_data))
+    height = 8
+    width = min(40, len(chart_data))
+    
+    # 创建二维图表数组
+    chart_grid = [[' ' for _ in range(width)] for _ in range(height)]
+    
+    # 绘制连线
+    for j in range(width):
+        if j < len(chart_data):
+            pnl = chart_data[j][1]
+            # 计算当前点在图表中的Y位置
+            point_y = int((max_pnl - pnl) / range_pnl * (height - 1))
+            point_y = max(0, min(height - 1, point_y))
+            
+            if j == 0:
+                # 第一个点
+                chart_grid[point_y][j] = '◆'
+            elif j == len(chart_data) - 1:
+                # 最后一个点
+                chart_grid[point_y][j] = '★'
+            else:
+                # 中间的点用连线符号
+                chart_grid[point_y][j] = '─'
+            
+            # 绘制到下一个点的连线
+            if j < len(chart_data) - 1 and j + 1 < width:
+                next_pnl = chart_data[j + 1][1]
+                next_point_y = int((max_pnl - next_pnl) / range_pnl * (height - 1))
+                next_point_y = max(0, min(height - 1, next_point_y))
+                
+                # 绘制垂直连线
+                start_y = min(point_y, next_point_y)
+                end_y = max(point_y, next_point_y)
+                
+                for y in range(start_y, end_y + 1):
+                    if chart_grid[y][j] == ' ':
+                        chart_grid[y][j] = '│'
     
     # 生成图表
     chart_lines = []
     chart_lines.append("📊 盈亏走势图:")
     chart_lines.append("=" * (width + 10))
     
-    # 绘制图表
+    # 输出图表
     for i in range(height):
         y = max_pnl - (i * range_pnl / height)
         line = f"{y:8.2f} |"
         
         for j in range(width):
-            if j < len(chart_data):
-                pnl = chart_data[j][1]
-                if abs(pnl - y) <= range_pnl / height / 2:
-                    line += "●"
-                else:
-                    line += " "
-            else:
-                line += " "
+            line += chart_grid[i][j]
         
         chart_lines.append(line)
     
-    # 添加底部边框（不显示时间轴）
-    chart_lines.append("        |" + "=" * width)
+    # 添加底部边框
+    chart_lines.append("        |" + "─" * width)
     chart_lines.append("=" * (width + 10))
     
     return "\n".join(chart_lines)
@@ -827,28 +929,95 @@ def should_send_notification(reduce_signals: Dict[str, List], add_signals: Dict[
     _notification_history[current_hash] = current_time
     return True
 
-def send_dingtalk_notification(message: str) -> bool:
+def send_dingtalk_notification(message: str, image_base64: Optional[str] = None) -> bool:
     """发送钉钉机器人通知"""
     if not ENABLE_DINGTALK_NOTIFICATION or not DINGTALK_WEBHOOK_URL:
         return False
     
-    headers = {'Content-Type': 'application/json'}
-    data = {
-        "msgtype": "text",
-        "text": {
-            "content": message
-        }
-    }
-    
     try:
-        response = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=data, timeout=10)
-        return response.status_code == 200
+        headers = {'Content-Type': 'application/json'}
+        
+        # 如果有图片且配置为分别发送
+        if image_base64 and DINGTALK_SEND_IMAGE_SEPARATELY:
+            # 发送文本消息
+            text_data = {
+                "msgtype": "text",
+                "text": {
+                    "content": message
+                }
+            }
+            
+            response1 = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=text_data, timeout=10)
+            text_success = response1.status_code == 200
+            
+            try:
+                # 解码图片数据
+                img_data = base64.b64decode(image_base64)
+                
+                # 保存图片到本地
+                local_img_path = CHART_IMAGE_FILE
+                with open(local_img_path, 'wb') as f:
+                    f.write(img_data)
+                print(f"📊 盈亏走势图已保存到: {local_img_path}")
+                
+                # 发送图片消息
+                image_data = {
+                    "msgtype": "image",
+                    "image": {
+                        "base64": image_base64,
+                        "md5": hashlib.md5(img_data).hexdigest()
+                    }
+                }
+                
+                response2 = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=image_data, timeout=10)
+                image_success = response2.status_code == 200
+                
+                if image_success:
+                    print("✅ 钉钉图片发送成功")
+                else:
+                    print(f"❌ 钉钉图片发送失败: {response2.status_code}, {response2.text}")
+                
+                return text_success and image_success
+                
+            except Exception as e:
+                print(f"发送图片失败: {e}")
+                return text_success
+        
+        else:
+            # 只发送文本消息（或图片发送失败时的后备方案）
+            if image_base64:
+                try:
+                    # 仍然保存图片到本地
+                    img_data = base64.b64decode(image_base64)
+                    local_img_path = CHART_IMAGE_FILE
+                    with open(local_img_path, 'wb') as f:
+                        f.write(img_data)
+                    print(f"📊 盈亏走势图已保存到: {local_img_path}")
+                    
+                    # 在消息中添加图片说明
+                    message += f"\n\n📊 盈亏走势图已生成，请查看本地文件: {local_img_path}"
+                    
+                except Exception as e:
+                    print(f"保存图片失败: {e}")
+                    message += "\n\n❌ 图片生成失败"
+            
+            # 发送文本消息
+            data = {
+                "msgtype": "text",
+                "text": {
+                    "content": message
+                }
+            }
+            
+            response = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=data, timeout=10)
+            return response.status_code == 200
+        
     except Exception as e:
         print(f"钉钉通知发送失败: {e}")
         return False
 
-def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> str:
-    """格式化信号为钉钉通知消息"""
+def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> Tuple[str, Optional[str]]:
+    """格式化信号为钉钉通知消息，返回消息文本和图片base64"""
     messages = []
     messages.append("🚨 币安交易提醒 🚨")
     messages.append(f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -892,14 +1061,20 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
         messages.append("✅ 当前无操作信号")
         messages.append("持续监控中...")
     
-    # 添加盈亏走势图
-    chart_data = generate_pnl_chart_data()
-    if chart_data:
-        chart_text = format_pnl_chart(chart_data)
-        messages.append("")
-        messages.append(chart_text)
+    # 生成盈亏走势图
+    image_base64 = None
+    if ENABLE_CHART_IMAGE:
+        image_base64 = generate_pnl_chart_image()
+        # 不在这里添加图片提示，会在发送时添加
+    else:
+        # 使用文本图表
+        chart_data = generate_pnl_chart_data()
+        if chart_data:
+            chart_text = format_pnl_chart(chart_data)
+            messages.append("")
+            messages.append(chart_text)
     
-    return "\n".join(messages)
+    return "\n".join(messages), image_base64
 
 def check_pnl_ratio_reduce_signals(account_info: Optional[Dict]) -> Dict[str, List]:
     """检查基于未实现盈亏占比的减仓信号"""
@@ -1314,16 +1489,18 @@ def run_analysis() -> None:
         
         # 生成并打印钉钉通知内容
         if reduce_signals or add_signals:
-            notification_message = format_signals_for_notification(reduce_signals, add_signals)
+            notification_message, image_base64 = format_signals_for_notification(reduce_signals, add_signals)
             print("\n" + "="*60)
             print("📱 钉钉通知内容:")
             print("="*60)
             print(notification_message)
+            if image_base64:
+                print("📊 盈亏走势图已生成")
             print("="*60)
             
             # 检查是否应该发送
             if should_send_notification(reduce_signals, add_signals):
-                success = send_dingtalk_notification(notification_message)
+                success = send_dingtalk_notification(notification_message, image_base64)
                 if success:
                     print("✅ 钉钉通知发送成功")
                 elif ENABLE_DINGTALK_NOTIFICATION:

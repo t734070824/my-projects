@@ -167,8 +167,13 @@ PNL_RATIO_REDUCE_STRATEGY = [
 # 钉钉机器人配置
 DINGTALK_WEBHOOK_URL = ""  # 钉钉机器人Webhook地址，需要配置
 ENABLE_DINGTALK_NOTIFICATION = False  # 是否启用钉钉通知
+DINGTALK_SEND_IMAGE_SEPARATELY = True  # 是否分别发送文本和图片消息（True: 文本+图片两条消息，False: 只发文本消息并提示本地图片）
 
 # 盈亏记录配置
 PNL_RECORD_INTERVAL = 60  # 记录间隔（秒），默认60秒
 PNL_RECORD_MAX_HOURS = 24  # 最大记录小时数，默认24小时
-PNL_RECORD_FILE = "pnl_history.json"  # 盈亏记录文件 
+PNL_RECORD_FILE = "pnl_history.json"  # 盈亏记录文件
+
+# 图表配置
+ENABLE_CHART_IMAGE = True  # 是否生成图片（False则使用文本图表）
+CHART_IMAGE_FILE = "pnl_chart.png"  # 图片保存文件名 

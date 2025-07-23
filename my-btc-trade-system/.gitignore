@@ -11,4 +11,5 @@ __pycache__/
 *.log
 
 # 盈亏记录文件
-pnl_history.json 
+pnl_history.json
+pnl_chart.png 
