@@ -148,7 +148,7 @@ MAX_POSITION_LIMITS = {
 
 
 # 操作频率限制
-MAX_DAILY_OPERATIONS_PER_SIDE = 1  # 单币种单日每个方向最多操作1次
+MAX_DAILY_OPERATIONS_PER_SIDE = 2  # 单币种单日每个方向最多操作1次
 MAX_CONSECUTIVE_ADD = 3            # 连续加仓不超过3次
 MAX_CONSECUTIVE_REDUCE = 4         # 连续减仓不超过4次
 
@@ -166,4 +166,9 @@ PNL_RATIO_REDUCE_STRATEGY = [
 
 # 钉钉机器人配置
 DINGTALK_WEBHOOK_URL = ""  # 钉钉机器人Webhook地址，需要配置
-ENABLE_DINGTALK_NOTIFICATION = False  # 是否启用钉钉通知 
+ENABLE_DINGTALK_NOTIFICATION = False  # 是否启用钉钉通知
+
+# 盈亏记录配置
+PNL_RECORD_INTERVAL = 60  # 记录间隔（秒），默认60秒
+PNL_RECORD_MAX_HOURS = 24  # 最大记录小时数，默认24小时
+PNL_RECORD_FILE = "pnl_history.json"  # 盈亏记录文件 

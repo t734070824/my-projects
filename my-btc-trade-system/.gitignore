@@ -8,4 +8,7 @@ __pycache__/
 *.pyd
 
 # 日志文件
-*.log 
+*.log
+
+# 盈亏记录文件
+pnl_history.json 

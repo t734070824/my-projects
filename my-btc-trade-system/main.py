@@ -4,7 +4,8 @@ import time
 import hmac
 import hashlib
 import schedule
-from typing import Dict, List, Optional, Any
+import os
+from typing import Dict, List, Optional, Any, Tuple
 from config import *
 from api_keys import API_KEY, SECRET_KEY
 
@@ -17,6 +18,147 @@ except ImportError:
 
 # 全局变量：存储最近发送的通知记录
 _notification_history = {}
+
+# 盈亏记录相关函数
+def load_pnl_history() -> List[Dict]:
+    """加载盈亏历史记录"""
+    try:
+        if os.path.exists(PNL_RECORD_FILE):
+            with open(PNL_RECORD_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"加载盈亏历史记录失败: {e}")
+    return []
+
+def save_pnl_history(history: List[Dict]) -> None:
+    """保存盈亏历史记录"""
+    try:
+        with open(PNL_RECORD_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存盈亏历史记录失败: {e}")
+
+def record_pnl(account_info: Optional[Dict]) -> None:
+    """记录当前未实现盈亏"""
+    if not account_info:
+        return
+    
+    total_pnl = float(account_info.get('totalUnrealizedProfit', 0))
+    total_wallet = float(account_info.get('totalWalletBalance', 0))
+    pnl_ratio = (total_pnl / total_wallet) * 100 if total_wallet > 0 else 0
+    
+    record = {
+        'timestamp': int(time.time()),
+        'datetime': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'pnl': total_pnl,
+        'pnl_ratio': pnl_ratio,
+        'total_wallet': total_wallet
+    }
+    
+    # 加载历史记录
+    history = load_pnl_history()
+    
+    # 添加新记录
+    history.append(record)
+    
+    # 清理过期记录（保留指定小时数）
+    current_time = int(time.time())
+    max_age = PNL_RECORD_MAX_HOURS * 3600
+    history = [h for h in history if current_time - h['timestamp'] <= max_age]
+    
+    # 保存记录
+    save_pnl_history(history)
+
+def get_pnl_statistics() -> Dict[str, Any]:
+    """获取盈亏统计信息"""
+    history = load_pnl_history()
+    
+    if not history:
+        return {
+            'max_pnl': 0,
+            'min_pnl': 0,
+            'max_pnl_time': '',
+            'min_pnl_time': '',
+            'current_pnl': 0,
+            'total_records': 0
+        }
+    
+    # 找出最高和最低盈亏
+    max_record = max(history, key=lambda x: x['pnl'])
+    min_record = min(history, key=lambda x: x['pnl'])
+    
+    # 获取最新记录
+    latest_record = history[-1] if history else {'pnl': 0}
+    
+    return {
+        'max_pnl': max_record['pnl'],
+        'min_pnl': min_record['pnl'],
+        'max_pnl_time': max_record['datetime'],
+        'min_pnl_time': min_record['datetime'],
+        'current_pnl': latest_record['pnl'],
+        'total_records': len(history)
+    }
+
+def generate_pnl_chart_data() -> List[Tuple[str, float]]:
+    """生成盈亏图表数据"""
+    history = load_pnl_history()
+    
+    if not history:
+        return []
+    
+    # 取最近100个数据点，避免图表过于密集
+    recent_history = history[-100:] if len(history) > 100 else history
+    
+    # 格式化时间显示（只显示小时:分钟）
+    chart_data = []
+    for record in recent_history:
+        time_str = record['datetime'][11:16]  # 提取 HH:MM
+        chart_data.append((time_str, record['pnl']))
+    
+    return chart_data
+
+def format_pnl_chart(chart_data: List[Tuple[str, float]]) -> str:
+    """格式化盈亏图表为文本"""
+    if not chart_data:
+        return "暂无数据"
+    
+    # 计算图表参数
+    pnl_values = [data[1] for data in chart_data]
+    min_pnl = min(pnl_values)
+    max_pnl = max(pnl_values)
+    range_pnl = max_pnl - min_pnl if max_pnl != min_pnl else 1
+    
+    # 图表高度和宽度
+    height = 10
+    width = min(50, len(chart_data))
+    
+    # 生成图表
+    chart_lines = []
+    chart_lines.append("📊 盈亏走势图:")
+    chart_lines.append("=" * (width + 10))
+    
+    # 绘制图表
+    for i in range(height):
+        y = max_pnl - (i * range_pnl / height)
+        line = f"{y:8.2f} |"
+        
+        for j in range(width):
+            if j < len(chart_data):
+                pnl = chart_data[j][1]
+                if abs(pnl - y) <= range_pnl / height / 2:
+                    line += "●"
+                else:
+                    line += " "
+            else:
+                line += " "
+        
+        chart_lines.append(line)
+    
+    # 添加底部边框（不显示时间轴）
+    chart_lines.append("        |" + "=" * width)
+    chart_lines.append("=" * (width + 10))
+    
+    return "\n".join(chart_lines)
 
 def calculate_change_and_amplitude(klines: List[List]) -> List[List]:
     """计算每条数据的涨跌和振幅，并将结果添加到klines中"""
@@ -712,6 +854,16 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
     messages.append(f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     messages.append("")
     
+    # 盈亏统计信息
+    pnl_stats = get_pnl_statistics()
+    if pnl_stats['total_records'] > 0:
+        messages.append("💰 盈亏统计:")
+        messages.append(f"   当前盈亏: {pnl_stats['current_pnl']:.2f}U")
+        messages.append(f"   最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})")
+        messages.append(f"   最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})")
+        messages.append(f"   记录数量: {pnl_stats['total_records']}条")
+        messages.append("")
+    
     # 减仓信号
     if reduce_signals:
         messages.append("📉 减仓提示:")
@@ -739,6 +891,13 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
     if not reduce_signals and not add_signals:
         messages.append("✅ 当前无操作信号")
         messages.append("持续监控中...")
+    
+    # 添加盈亏走势图
+    chart_data = generate_pnl_chart_data()
+    if chart_data:
+        chart_text = format_pnl_chart(chart_data)
+        messages.append("")
+        messages.append(chart_text)
     
     return "\n".join(messages)
 
@@ -1029,6 +1188,26 @@ def print_operation_frequency(positions: Optional[List]) -> None:
                     side_name = side_names.get(side, side)
                     print(f"  {side_name}: {count}次")
 
+def print_pnl_statistics() -> None:
+    """打印盈亏统计信息"""
+    pnl_stats = get_pnl_statistics()
+    
+    if pnl_stats['total_records'] == 0:
+        print("\n=== 盈亏统计 ===")
+        print("暂无盈亏记录数据")
+        return
+    
+    print("\n=== 盈亏统计 ===")
+    print(f"当前盈亏: {pnl_stats['current_pnl']:.2f}U")
+    print(f"最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})")
+    print(f"最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})")
+    print(f"记录数量: {pnl_stats['total_records']}条")
+    
+    # 显示盈亏走势图
+    chart_data = generate_pnl_chart_data()
+    if chart_data:
+        print("\n" + format_pnl_chart(chart_data))
+
 def print_add_position_signals(signals: Dict[str, List]) -> None:
     """打印加仓信号"""
     if not signals:
@@ -1056,6 +1235,17 @@ def print_add_position_signals(signals: Dict[str, List]) -> None:
             print(f"  趋势: {signal.get('trend', '未知')}")
             print(f"  条件: {signal['condition']}")
             print(f"  建议加仓: {signal['amount']}U")
+
+def record_pnl_only() -> None:
+    """仅记录盈亏数据（用于定时任务）"""
+    try:
+        account_info = get_account_info()
+        if account_info:
+            record_pnl(account_info)
+            total_pnl = float(account_info.get('totalUnrealizedProfit', 0))
+            print(f"📊 记录盈亏: {total_pnl:.2f}U - {time.strftime('%H:%M:%S')}")
+    except Exception as e:
+        print(f"❌ 记录盈亏失败: {e}")
 
 def run_analysis() -> None:
     """执行一次完整的分析"""
@@ -1087,6 +1277,9 @@ def run_analysis() -> None:
         account_info = get_account_info()
         print_account_info(account_info)
         
+        # 记录盈亏数据
+        record_pnl(account_info)
+        
         positions = get_positions()
         print_positions(positions)
         
@@ -1115,6 +1308,9 @@ def run_analysis() -> None:
         
         # 分析没有操作信号的原因
         analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
+        
+        # 显示盈亏统计
+        print_pnl_statistics()
         
         # 生成并打印钉钉通知内容
         if reduce_signals or add_signals:
@@ -1147,12 +1343,18 @@ def main() -> None:
     """主函数 - 设置定时任务"""
     print("=== 币安交易风险提示系统 ===")
     print("系统启动，每分钟执行一次分析...")
+    print(f"盈亏记录间隔: {PNL_RECORD_INTERVAL}秒")
+    print(f"最大记录时长: {PNL_RECORD_MAX_HOURS}小时")
     
     # 立即执行一次
     run_analysis()
     
-    # 设置定时任务：每分钟执行一次
+    # 设置定时任务：每分钟执行一次完整分析
     schedule.every().minute.do(run_analysis)
+    
+    # 设置定时任务：按配置间隔记录盈亏
+    if PNL_RECORD_INTERVAL != 60:  # 如果记录间隔不是1分钟，单独设置
+        schedule.every(PNL_RECORD_INTERVAL).seconds.do(record_pnl_only)
     
     # 保持程序运行
     while True:
