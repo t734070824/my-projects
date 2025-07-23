@@ -85,7 +85,8 @@ def get_pnl_statistics() -> Dict[str, Any]:
             'max_pnl_time': '',
             'min_pnl_time': '',
             'current_pnl': 0,
-            'total_records': 0
+            'total_records': 0,
+            'average_pnl': 0
         }
     
     # 找出最高和最低盈亏
@@ -95,13 +96,17 @@ def get_pnl_statistics() -> Dict[str, Any]:
     # 获取最新记录
     latest_record = history[-1] if history else {'pnl': 0}
     
+    # 计算平均盈亏
+    average_pnl = sum(record['pnl'] for record in history) / len(history)
+    
     return {
         'max_pnl': max_record['pnl'],
         'min_pnl': min_record['pnl'],
         'max_pnl_time': max_record['datetime'],
         'min_pnl_time': min_record['datetime'],
         'current_pnl': latest_record['pnl'],
-        'total_records': len(history)
+        'total_records': len(history),
+        'average_pnl': average_pnl
     }
 
 def generate_pnl_chart_data() -> List[Tuple[str, float]]:
@@ -433,9 +438,13 @@ def print_positions(positions: Optional[List]) -> None:
         position_side = pos.get('positionSide', '')
         size = float(pos.get('positionAmt', 0))
         side = "多头" if size > 0 else "空头"
+        entry_price = float(pos.get('entryPrice', 0))
+        position_value = abs(size * entry_price)
+        notional = float(pos.get('notional', 0))
         
         print(f"\n{symbol} ({position_side}):")
         print(f"  方向: {side}")
+        print(f"  持仓价值: {notional:.2f} USDT")
         
         # 只显示指定字段
         display_fields = [
@@ -1031,6 +1040,7 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
         messages.append(f"   最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})")
         messages.append(f"   最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})")
         messages.append(f"   记录数量: {pnl_stats['total_records']}条")
+        messages.append(f"   平均盈亏: {pnl_stats['average_pnl']:.2f}U")
         messages.append("")
     
     # 减仓信号
@@ -1376,6 +1386,7 @@ def print_pnl_statistics() -> None:
     print(f"当前盈亏: {pnl_stats['current_pnl']:.2f}U")
     print(f"最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})")
     print(f"最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})")
+    print(f"平均盈亏: {pnl_stats['average_pnl']:.2f}U")
     print(f"记录数量: {pnl_stats['total_records']}条")
     
     # 显示盈亏走势图
