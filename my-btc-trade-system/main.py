@@ -761,11 +761,13 @@ def apply_margin_control(signals: Dict[str, List], margin_level: str, signal_typ
     
     return controlled_signals
 
-def analyze_no_signal_reasons(positions: Optional[List], klines_data: Dict[str, List], trend_results: Dict[str, Dict], account_info: Optional[Dict], reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> None:
-    """分析没有信号的原因"""
+def analyze_no_signal_reasons(positions: Optional[List], klines_data: Dict[str, List], trend_results: Dict[str, Dict], account_info: Optional[Dict], reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> Dict[str, List[str]]:
+    """分析没有信号的原因，返回分析结果字典"""
+    no_signal_analysis = {}
+
     if not positions or not klines_data:
-        return
-    
+        return no_signal_analysis
+
     print("\n=== 无操作原因分析 ===")
     
     for pos in positions:
@@ -887,10 +889,20 @@ def analyze_no_signal_reasons(positions: Optional[List], klines_data: Dict[str, 
         if not reasons:
             reasons.append("当前价位不满足任何操作条件")
         
-        for reason in reasons:
+        # 添加当前状态信息
+        status_info = f"成本{entry_price:.4f} 现价{current_price:.4f} 趋势{trend}"
+        reasons.append(status_info)
+
+        # 保存到返回结果
+        no_signal_analysis[symbol] = reasons
+
+        # 仍然在控制台打印
+        for reason in reasons[:-1]:  # 除了最后的状态信息
             print(f"  • {reason}")
         
-        print(f"  当前状态: 成本{entry_price:.4f} 现价{current_price:.4f} 趋势{trend}")
+        print(f"  当前状态: {status_info}")
+
+    return no_signal_analysis
 
 def generate_signal_hash(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> str:
     """生成信号的唯一标识哈希值"""
@@ -1025,7 +1037,7 @@ def send_dingtalk_notification(message: str, image_base64: Optional[str] = None)
         print(f"钉钉通知发送失败: {e}")
         return False
 
-def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> Tuple[str, Optional[str]]:
+def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List], no_signal_analysis: Optional[Dict[str, List[str]]]=None) -> Tuple[str, Optional[str]]:
     """格式化信号为钉钉通知消息，返回消息文本和图片base64"""
     messages = []
     messages.append("🚨 币安交易提醒 🚨")
@@ -1084,6 +1096,14 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
             messages.append("")
             messages.append(chart_text)
     
+    # 添加无操作原因分析
+    if no_signal_analysis:
+        messages.append("\n❌ 无操作信号原因分析:")
+        for symbol, reasons in no_signal_analysis.items():
+            messages.append(f"\n{symbol}:")
+            for reason in reasons:
+                messages.append(f"  • {reason}")
+
     return "\n".join(messages), image_base64
 
 def check_pnl_ratio_reduce_signals(account_info: Optional[Dict]) -> Dict[str, List]:
@@ -1493,14 +1513,14 @@ def run_analysis() -> None:
         print_add_position_signals(add_signals)
         
         # 分析没有操作信号的原因
-        analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
-        
+        no_signal_analysis = analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
+
         # 显示盈亏统计
         print_pnl_statistics()
         
         # 生成并打印钉钉通知内容
         if reduce_signals or add_signals:
-            notification_message, image_base64 = format_signals_for_notification(reduce_signals, add_signals)
+            notification_message, image_base64 = format_signals_for_notification(reduce_signals, add_signals,no_signal_analysis)
             print("\n" + "="*60)
             print("📱 钉钉通知内容:")
             print("="*60)
@@ -1518,7 +1538,16 @@ def run_analysis() -> None:
                     print("❌ 钉钉通知发送失败")
             else:
                 print("⏭️ 相同信号已在10分钟内发送，跳过钉钉通知")
-                
+        else:
+            # 无操作信号时，生成包含无操作原因分析的通知
+            notification_message, image_base64 = format_signals_for_notification(reduce_signals, add_signals, no_signal_analysis)
+            print("\n" + "="*60)
+            print("📱 钉钉通知内容:")
+            print("="*60)
+            print(notification_message)
+            if image_base64:
+                print("📊 盈亏走势图已生成")
+            print("="*60)
     except Exception as e:
         print(f"❌ 分析执行失败: {e}")
         # 发送错误通知
@@ -1557,4 +1586,4 @@ def main() -> None:
             time.sleep(60)  # 出错后等待1分钟再继续
 
 if __name__ == "__main__":
-    main() 
+    main()
