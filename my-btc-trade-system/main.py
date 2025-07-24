@@ -1,5 +1,3 @@
-
-
 import schedule
 import time
 from typing import Dict, List, Optional
@@ -283,15 +281,20 @@ def run_analysis() -> None:
         print_pnl_statistics()
 
         # 4. 钉钉通知
-        if reduce_signals or add_signals:
-            notification_message = format_signals_for_notification(reduce_signals, add_signals, no_signal_analysis)
+        if reduce_signals or add_signals or risk_warnings:
+            notification_message = format_signals_for_notification(
+                reduce_signals, 
+                add_signals, 
+                no_signal_analysis,
+                risk_warnings
+            )
             print("\n" + "="*60)
             print("📱 钉钉通知内容:")
             print("="*60)
             print(notification_message)
             print("="*60)
             
-            if should_send_notification(reduce_signals, add_signals):
+            if should_send_notification(reduce_signals, add_signals, risk_warnings):
                 success = send_dingtalk_notification(notification_message)
                 if success:
                     print("✅ 钉钉通知发送成功")
@@ -345,3 +348,12 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def record_pnl_only() -> None:
+    """仅记录盈亏信息"""
+    try:
+        account_info = get_account_info()
+        record_pnl(account_info)
+    except Exception as e:
+        print(f"记录盈亏失败: {e}")

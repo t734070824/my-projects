@@ -7,35 +7,51 @@ from pnl import get_pnl_statistics
 
 _notification_history = {}
 
-def generate_signal_hash(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> str:
+def generate_signal_hash(
+    reduce_signals: Dict[str, List], 
+    add_signals: Dict[str, List],
+    risk_warnings: Optional[Dict[str, List[str]]] = None
+) -> str:
     """生成信号的唯一标识哈希值"""
     signal_data = []
     
     # 减仓信号
-    for symbol, signal_list in reduce_signals.items():
-        for signal in signal_list:
-            signal_key = f"{symbol}_{signal['type']}_{signal.get('percentage', 0)}"
-            signal_data.append(signal_key)
+    if reduce_signals:
+        for symbol, signal_list in reduce_signals.items():
+            for signal in signal_list:
+                signal_key = f"{symbol}_{signal['type']}_{signal.get('percentage', 0)}"
+                signal_data.append(signal_key)
     
     # 加仓信号
-    for symbol, signal_list in add_signals.items():
-        for signal in signal_list:
-            signal_key = f"{symbol}_{signal['type']}_{signal.get('amount', 0)}_{signal.get('position_side', '')}"
-            signal_data.append(signal_key)
+    if add_signals:
+        for symbol, signal_list in add_signals.items():
+            for signal in signal_list:
+                signal_key = f"{symbol}_{signal['type']}_{signal.get('amount', 0)}_{signal.get('position_side', '')}"
+                signal_data.append(signal_key)
+
+    # 风险警告
+    if risk_warnings:
+        for symbol, warning_list in risk_warnings.items():
+            for warning in warning_list:
+                signal_data.append(f"{symbol}_risk_{warning}")
     
     # 生成哈希
     signal_str = "_".join(sorted(signal_data))
     return str(hash(signal_str))
 
-def should_send_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List]) -> bool:
+def should_send_notification(
+    reduce_signals: Dict[str, List], 
+    add_signals: Dict[str, List],
+    risk_warnings: Optional[Dict[str, List[str]]] = None
+) -> bool:
     """检查是否应该发送通知（10分钟内不重复发送相同内容）"""
     global _notification_history
     
-    if not reduce_signals and not add_signals:
+    if not reduce_signals and not add_signals and not risk_warnings:
         return False
     
     # 生成当前信号的哈希值
-    current_hash = generate_signal_hash(reduce_signals, add_signals)
+    current_hash = generate_signal_hash(reduce_signals, add_signals, risk_warnings)
     current_time = time.time()
     
     # 清理10分钟前的记录
@@ -76,12 +92,30 @@ def send_dingtalk_notification(message: str) -> bool:
         print(f"钉钉通知发送失败: {e}")
         return False
 
-def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals: Dict[str, List], no_signal_analysis: Optional[Dict[str, List[str]]]=None) -> str:
+def format_signals_for_notification(
+    reduce_signals: Dict[str, List], 
+    add_signals: Dict[str, List], 
+    no_signal_analysis: Optional[Dict[str, List[str]]] = None,
+    risk_warnings: Optional[Dict[str, List[str]]] = None
+) -> str:
     """格式化信号为钉钉通知消息"""
     messages = []
     messages.append("🚨 币安交易提醒 🚨")
     messages.append(f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     messages.append("")
+
+    # 风控红线警告
+    if risk_warnings:
+        messages.append("=== ⚠️ 风控红线警告 ⚠️ ===")
+        for symbol, warning_list in risk_warnings.items():
+            if symbol == 'SYSTEM':
+                messages.append(f"🚨 系统级风险:")
+            else:
+                messages.append(f"⚠️ {symbol}:")
+            for warning in warning_list:
+                messages.append(f"  • {warning}")
+        messages.append("建议立即检查并调整仓位！")
+        messages.append("")
     
     # 盈亏统计信息
     pnl_stats = get_pnl_statistics()
@@ -118,7 +152,7 @@ def format_signals_for_notification(reduce_signals: Dict[str, List], add_signals
                 messages.append(f"   建议加仓: {signal['amount']}U")
         messages.append("")
     
-    if not reduce_signals and not add_signals:
+    if not reduce_signals and not add_signals and not risk_warnings:
         messages.append("✅ 当前无操作信号")
         messages.append("持续监控中...")
     
