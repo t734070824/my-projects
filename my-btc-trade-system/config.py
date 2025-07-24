@@ -149,8 +149,6 @@ MAX_POSITION_LIMITS = {
 
 # 操作频率限制
 MAX_DAILY_OPERATIONS_PER_SIDE = 10  # 单币种单日每个方向最多操作1次
-MAX_CONSECUTIVE_ADD = 3            # 连续加仓不超过3次
-MAX_CONSECUTIVE_REDUCE = 4         # 连续减仓不超过4次
 
 # 强制平仓条件
 FORCE_CLOSE_MARGIN_RATIO = 85    # 保证金使用率达到85%

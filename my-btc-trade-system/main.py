@@ -11,7 +11,7 @@ from analysis import (
     check_pnl_ratio_reduce_signals, generate_reduce_position_signals, 
     generate_add_position_signals, analyze_no_signal_reasons
 )
-from pnl import record_pnl, get_pnl_statistics, record_pnl as record_pnl_only
+from pnl import record_pnl, get_pnl_statistics
 from alerter import format_signals_for_notification, should_send_notification, send_dingtalk_notification
 
 def print_account_info(account_info: Optional[Dict]) -> None:

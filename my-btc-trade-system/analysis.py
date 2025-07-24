@@ -200,7 +200,7 @@ def check_risk_control(positions: Optional[List], account_info: Optional[Dict]) 
         if total_wallet > 0:
             loss_ratio = abs(pnl / total_wallet) * 100 if pnl < 0 else 0
             if loss_ratio > FORCE_CLOSE_SINGLE_LOSS:
-                position_warnings.append(f"单币种亏损超限: {loss_ratio:.1f}% > {FORCE_CLOSE_SINGLE_LOSS}%")
+                position_warnings.append(f"单币种亏损超限: {pnl:.1f}/{total_wallet:.1f},{loss_ratio:.1f}% > {FORCE_CLOSE_SINGLE_LOSS}%")
         
         if position_warnings:
             warnings[symbol] = position_warnings
