@@ -165,8 +165,8 @@ PNL_RATIO_REDUCE_STRATEGY = [
 ]
 
 # 钉钉机器人配置
-DINGTALK_WEBHOOK_URL = ""  # 钉钉机器人Webhook地址，需要配置
-ENABLE_DINGTALK_NOTIFICATION = False  # 是否启用钉钉通知
+DINGTALK_WEBHOOK_URL = "https://oapi.dingtalk.com/robot/send?access_token=f039bbc0bc60ddc6ef65edb56505af5aa16e057e1e295a6bfd8835f57858f82e"  # 钉钉机器人Webhook地址，需要配置
+ENABLE_DINGTALK_NOTIFICATION = True  # 是否启用钉钉通知
 
 # 盈亏记录配置
 PNL_RECORD_INTERVAL = 60  # 记录间隔（秒），默认60秒
