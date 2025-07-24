@@ -392,7 +392,7 @@ def print_account_info(account_info: Optional[Dict]) -> None:
         value = float(account_info.get(key, 0))
         print(f"{label}: {value:.4f} USDT")
     
-    # 计算并显示未实现盈亏占比
+    # 计算���显示未实现盈亏占比
     total_wallet = float(account_info.get('totalWalletBalance', 0))
     total_pnl = float(account_info.get('totalUnrealizedProfit', 0))
     
@@ -712,10 +712,20 @@ def check_operation_frequency(positions: Optional[List]) -> Dict[str, Dict[str, 
             daily_operations[symbol] = {'LONG': 0, 'SHORT': 0, 'BOTH': 0}
             continue
         
-        # 统计各方向的操作次数
+        # 统计各方向的操作次数，根据orderId去重
         side_counts = {'LONG': 0, 'SHORT': 0, 'BOTH': 0}
-        
+        seen_order_ids = set()  # 用于去重的订单ID集合
+
         for trade in trades:
+            order_id = trade.get('orderId')
+
+            # 如果订单ID已经处理过，跳过
+            if order_id in seen_order_ids:
+                continue
+
+            # 记录订单ID
+            seen_order_ids.add(order_id)
+
             position_side = trade.get('positionSide', 'BOTH')
             if position_side in side_counts:
                 side_counts[position_side] += 1
@@ -884,7 +894,7 @@ def analyze_no_signal_reasons(positions: Optional[List], klines_data: Dict[str, 
                     min_callback_threshold = max(threshold for threshold, _ in above_cost_strategy)  # 最大负值
                     if high_diff_pct > min_callback_threshold:
                         reasons.append(f"从{high_days}高点回调{abs(high_diff_pct):.2f}%未达阈值{abs(min_callback_threshold)}%")
-        
+
         # 显示原因
         if not reasons:
             reasons.append("当前价位不满足任何操作条件")
@@ -1467,13 +1477,13 @@ def run_analysis() -> None:
             return
         
         # 显示K线数据概览
-        for symbol, klines in all_data.items():
-            if klines:
-                print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
-                print("最后5条数据的涨跌和振幅:")
-                for kline in klines[-5:]:
-                    if len(kline) >= 15:  # 确保有扩展数据
-                        print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
+        # for symbol, klines in all_data.items():
+        #     if klines:
+        #         # print(f"\n{symbol} - 获取到 {len(klines)} 条K线数据")
+        #         # print("最后5条数据的涨跌和振幅:")
+        #         for kline in klines[-5:]:
+        #             if len(kline) >= 15:  # 确保有扩展数据
+        #                 print(f"时间: {kline[0]}, 涨跌: {kline[-3]:.4f} ({kline[-2]:.2f}%), 振幅: {kline[-1]:.2f}%")
         
         # 趋势识别分析
         trend_results = calculate_trend_indicators(all_data)
