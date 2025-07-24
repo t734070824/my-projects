@@ -1,6 +1,14 @@
 import schedule
 import time
+import matplotlib.pyplot as plt
+import os
 from typing import Dict, List, Optional
+import matplotlib
+from datetime import datetime
+
+# 设置matplotlib支持中文
+matplotlib.rcParams['font.family'] = ['SimHei', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False # 解决负号显示问题
 
 from config import PNL_RECORD_INTERVAL, PNL_RECORD_MAX_HOURS, ENABLE_DINGTALK_NOTIFICATION
 from data_provider import get_multiple_symbols_data, get_account_info, get_positions
@@ -9,7 +17,7 @@ from analysis import (
     check_pnl_ratio_reduce_signals, generate_reduce_position_signals, 
     generate_add_position_signals, analyze_no_signal_reasons
 )
-from pnl import record_pnl, get_pnl_statistics
+from pnl import record_pnl, get_pnl_statistics, load_pnl_history
 from alerter import format_signals_for_notification, should_send_notification, send_dingtalk_notification
 
 def print_account_info(account_info: Optional[Dict]) -> None:
@@ -279,6 +287,7 @@ def run_analysis() -> None:
         print_add_position_signals(add_signals)
         no_signal_analysis = analyze_no_signal_reasons(positions, all_data, trend_results, account_info, reduce_signals, add_signals)
         print_pnl_statistics()
+        generate_pnl_chart_locally()
 
         # 4. 钉钉通知
         if reduce_signals or add_signals or risk_warnings:
@@ -316,6 +325,44 @@ def run_analysis() -> None:
         send_dingtalk_notification(error_message)
     
     print(f"\n分析完成 - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+def generate_pnl_chart_locally() -> None:
+    """生成盈亏折线图并保存到本地"""
+    try:
+        history = load_pnl_history()
+        if not history:
+            print("无盈亏记录，无法生成图表")
+            return
+
+        timestamps = [record['timestamp'] for record in history]
+        pnls = [record['pnl'] for record in history]
+
+        # 将时间戳转换为日期时间对象
+        datetimes = [datetime.fromtimestamp(ts) for ts in timestamps]
+
+        plt.figure(figsize=(12, 6))
+        plt.plot(datetimes, pnls, linestyle='-', color='skyblue')
+        
+        # 标记开始和结束点
+        if datetimes and pnls:
+            plt.plot(datetimes[0], pnls[0], marker='o', markersize=8, color='green', label='开始')
+            plt.plot(datetimes[-1], pnls[-1], marker='D', markersize=8, color='red', label='结束')
+            plt.legend()
+        plt.title('未实现盈亏 (PNL) 历史趋势')
+        plt.xlabel('时间')
+        plt.ylabel('PNL (USDT)')
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        # 保存图表到本地文件
+        img_path = "pnl_chart.png"
+        plt.savefig(img_path)
+        plt.close()
+        print(f"✅ 盈亏图表已保存到本地: {img_path}")
+
+    except Exception as e:
+        print(f"生成盈亏图表失败: {e}")
 
 def main() -> None:
     """主函数 - 设置定时任务"""
@@ -357,3 +404,4 @@ def record_pnl_only() -> None:
         record_pnl(account_info)
     except Exception as e:
         print(f"记录盈亏失败: {e}")
+
