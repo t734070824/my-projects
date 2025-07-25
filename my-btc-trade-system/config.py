@@ -168,5 +168,5 @@ ENABLE_DINGTALK_NOTIFICATION = True  # 是否启用钉钉通知
 
 # 盈亏记录配置
 PNL_RECORD_INTERVAL = 60  # 记录间隔（秒），默认60秒
-PNL_RECORD_MAX_HOURS = 24  # 最大记录小时数，默认24小时
+PNL_RECORD_MAX_HOURS = 168  # 最大记录小时数，默认24小时
 PNL_RECORD_FILE = "pnl_history.json"  # 盈亏记录文件 
