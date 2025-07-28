@@ -18,7 +18,7 @@ TIMEZONE = "0"  # 时区偏移，0表示UTC时间
 # 代理配置
 # True: 使用系统代理设置 (如v2rayN等)
 # False: 禁用代理，直接连接
-USE_PROXY = False
+USE_PROXY = True
 
 # 趋势判断阈值配置
 STRONG_UP_CHANGE = 15  # 强势上升7日涨幅阈值
