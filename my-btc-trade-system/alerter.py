@@ -69,23 +69,35 @@ def should_send_notification(
     _notification_history[current_hash] = current_time
     return True
 
-def send_dingtalk_notification(message: str) -> bool:
-    """发送钉钉机器人通知"""
+def send_dingtalk_notification(message: str, image_url: Optional[str] = None) -> bool:
+    """发送钉钉机器人通知，支持文本或Markdown（带图片）"""
     if not ENABLE_DINGTALK_NOTIFICATION or not DINGTALK_WEBHOOK_URL:
         return False
-    
+
     try:
         headers = {'Content-Type': 'application/json'}
         
-        # 只发送文本消息
-        data = {
-            "msgtype": "text",
-            "text": {
-                "content": message
+        # 如果有图片URL，则发送Markdown格式
+        if image_url:
+            # 在消息末尾添加Markdown格式的图片
+            markdown_text = f"{message}\n\n![盈亏图表]({image_url})"
+            data = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": "币安交易提醒",
+                    "text": markdown_text
+                }
             }
-        }
+        else:
+            # 否则，只发送纯文本消息
+            data = {
+                "msgtype": "text",
+                "text": {
+                    "content": message
+                }
+            }
         
-        response = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=data, timeout=10)
+        response = requests.post(DINGTALK_WEBHOOK_URL, headers=headers, json=data, timeout=15)
         return response.status_code == 200
         
     except Exception as e:
@@ -164,4 +176,5 @@ def format_signals_for_notification(
             for reason in reasons:
                 messages.append(f"  • {reason}")
 
-    return "\n".join(messages)
+    # 使用两个空格+换行符来确保在钉钉Markdown中正确换行
+    return "  \n".join(messages)

@@ -304,7 +304,9 @@ def run_analysis() -> None:
             print("="*60)
             
             if should_send_notification(reduce_signals, add_signals, risk_warnings):
-                success = send_dingtalk_notification(notification_message)
+                # 定义图片URL
+                pnl_image_url = "http://38.147.185.108:8088/pnl_chart.png"
+                success = send_dingtalk_notification(notification_message, image_url=pnl_image_url)
                 if success:
                     print("✅ 钉钉通知发送成功")
                 elif ENABLE_DINGTALK_NOTIFICATION:
