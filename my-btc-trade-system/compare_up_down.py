@@ -38,7 +38,7 @@ def calculate_trend_correlation(result: dict) -> dict:
 
             # 判断涨跌方向是否相同
             # 同为正数（同涨）或同为负数（同跌）
-            if (btc_change > 0 and other_change > 0) or (btc_change < 0 and other_change < 0):
+            if (btc_change > 0 and other_change > 0) or (btc_change < 0 and other_change < 0) or abs(btc_change - other_change) < 2:
                 same_trend_days += 1
 
         
