@@ -7,7 +7,7 @@ class BbandRsi(IStrategy):
 
     # config文件中如果有 "minimal_roi"则会重写下面的minimal_roi
     # 1min 中后roi为正就继续持有，0min后roi大于-0.1%则继续持有。。。
-    # minimal_roi = {
+    minimal_roi = {
          "1": 0.00,
          "0": -0.001
     }
