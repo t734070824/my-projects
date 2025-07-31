@@ -38,8 +38,10 @@ def calculate_trend_correlation(result: dict) -> dict:
 
             # 判断涨跌方向是否相同
             # 同为正数（同涨）或同为负数（同跌）
-            if (btc_change > 0 and other_change > 0) or (btc_change < 0 and other_change < 0) or abs(btc_change - other_change) < 2:
+            if (btc_change > 0 and other_change > 0) or (btc_change < 0 and other_change < 0) or abs(btc_change - other_change) < 3:
                 same_trend_days += 1
+                # if btc_change * other_change <0 and  abs(btc_change - other_change) < 2:
+                #     print(f"警告：{symbol} 与 BTCUSDT 的涨跌幅差异过小，可能是数据异常。", btc_change, other_change)
 
         
         # 计算百分比
