@@ -6,7 +6,6 @@ import logging
 import json
 
 # 配置基础日志
-# 在实际应用中，这部分可以更复杂，例如输出到文件或日志服务
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -16,9 +15,6 @@ logging.basicConfig(
 class SignalGenerator:
     """
     一个多维度、基于评分的交易信号生成器。
-
-    它综合了趋势、动量、波动性和成交量等多个维度来评估市场状态，
-    并为自动化交易系统提供清晰、结构化的信号。
     """
 
     def __init__(self, symbol: str, timeframe: str = '4h', proxy: Optional[str] = None):
@@ -36,11 +32,10 @@ class SignalGenerator:
         
         exchange_config = {
             'options': {
-                'defaultType': 'future'  # 确保我们获取的是U本位合约数据
+                'defaultType': 'future'
             }
         }
 
-        # 如果提供了代理，则进行配置
         if proxy:
             self.logger.info(f"使用代理: {proxy}")
             exchange_config['proxies'] = {
@@ -50,23 +45,41 @@ class SignalGenerator:
 
         self.exchange = ccxt.binance(exchange_config)
         self.history_limit = 400
+        self.required_columns = [
+            'SMA_20', 'SMA_50', 'SMA_200',
+            'MACD_12_26_9', 'MACDs_12_26_9',
+            'RSI_14',
+            'BBU_20_2.0', 'BBL_20_2.0',
+            'VOL_SMA_20'
+        ]
 
     def _fetch_data(self) -> pd.DataFrame:
         """
-        从币安获取OHLCV数据。
-
-        Returns:
-            pd.DataFrame: 包含OHLCV数据的Pandas DataFrame，如果获取失败则返回空DataFrame。
+        从币安获取OHLCV数据并确保数据类型正确。
         """
         try:
             self.logger.debug(f"开始获取 {self.symbol} 在 {self.timeframe} 周期上的K线数据...")
             ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=self.history_limit)
+            if not ohlcv:
+                self.logger.warning("API未返回任何K线数据。")
+                return pd.DataFrame()
+
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            self.logger.debug("数据获取并转换成功。")
+
+            # --- 关键修复：强制将OHLCV列转换为数字类型 ---
+            # 这是为了防止pandas将它们错误地识别为字符串(object)，从而导致技术指标计算失败
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 删除任何可能由于类型转换失败而产生的含有NaN的行
+            df.dropna(subset=numeric_cols, inplace=True)
+
+            self.logger.debug(f"成功获取并清洗了 {len(df)} 条K线数据。")
             return df
         except Exception as e:
-            self.logger.error(f"数据获取失败: {e}", exc_info=True)
+            self.logger.error(f"数据获取或处理失败: {e}", exc_info=True)
             return pd.DataFrame()
 
     def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -89,10 +102,15 @@ class SignalGenerator:
         """
         应用多维度评分逻辑，生成最终信号。
         """
-        if len(df) < self.history_limit - 1:
-            self.logger.warning(f"数据不足 ({len(df)}/{self.history_limit})，无法应用评分逻辑。" )
+        missing_cols = [col for col in self.required_columns if col not in df.columns]
+        if missing_cols:
+            self.logger.warning(f"评分中止：缺少必要的指标列: {missing_cols}。")
             return {}
-            
+
+        if len(df) < 2:
+            self.logger.warning("数据行数不足，无法安全地进行评分。" )
+            return {}
+
         latest = df.iloc[-2]
         self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。" )
 
@@ -152,7 +170,8 @@ class SignalGenerator:
         self.logger.info("开始生成信号...")
         df = self._fetch_data()
         if df.empty:
-            return {"error": "无法获取K线数据"}
+            self.logger.warning("数据为空，中止信号生成。" )
+            return {"error": "无法获取或处理K线数据"}
 
         df_with_indicators = self._calculate_indicators(df)
         final_signal = self._apply_scoring_logic(df_with_indicators)
@@ -160,39 +179,33 @@ class SignalGenerator:
         if final_signal:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
         else:
-            self.logger.warning("信号生成失败，可能由于数据不足。" )
+            self.logger.warning("信号生成失败，已中止。" )
 
         return final_signal
 
 # --- 使用示例：多时间周期分析框架 ---
 if __name__ == '__main__':
-    # !! 重要: 如果您在中国大陆或其他网络受限地区，请在此处填入您的代理服务器地址 !!
-    # 例如: PROXY = 'http://127.0.0.1:7890' (适用于 Clash, v2rayN 等)
-    # 或: PROXY = 'socks5://127.0.0.1:1080' (适用于 Shadowsocks 等)
     PROXY = 'http://127.0.0.1:10809'  # <-- 在这里修改您的代理, 如果不需要代理，请设置为 None
-
-    # 交易对
     SYMBOL = 'BTC/USDT'
 
-    # 1. 战略层面：使用日线图 (1d) 判断牛熊大环境
     logging.info("--- 1. 分析战略层面 (日线图) ---")
     daily_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='1d', proxy=PROXY)
     daily_analysis = daily_signal_gen.generate_signal()
     if daily_analysis and 'error' not in daily_analysis:
-        logging.info(f"日线分析结果: \n{json.dumps(daily_analysis, indent=4, default=str)}")
+        logging.info(f"日线分析结果: 
+{json.dumps(daily_analysis, indent=4, default=str)}")
         is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
         long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
         logging.info(f"长期趋势判断: {long_term_direction}")
 
-        # 2. 战术层面：使用4小时图 (4h) 寻找具体的交易机会
         logging.info("--- 2. 分析战术层面 (4小时图) ---")
         h4_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='4h', proxy=PROXY)
         h4_analysis = h4_signal_gen.generate_signal()
         if h4_analysis and 'error' not in h4_analysis:
-            logging.info(f"4小时线分析结果: \n{json.dumps(h4_analysis, indent=4, default=str)}")
+            logging.info(f"4小时线分析结果: 
+{json.dumps(h4_analysis, indent=4, default=str)}")
             trade_signal = h4_analysis.get('signal', 'NEUTRAL')
 
-            # 3. 决策逻辑
             logging.info("--- 3. 最终决策 ---")
             final_decision = "HOLD"
             if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
@@ -204,4 +217,4 @@ if __name__ == '__main__':
             else:
                 logging.info(f"决策: {final_decision} - 原因: 长短期方向冲突或信号不明 ({long_term_direction} vs {trade_signal})。建议观望。" )
     else:
-        logging.error("无法完成分析，因为在战略层面(日线)数据获取失败。" )
+        logging.error("无法完成分析，因为在战略层面(日线)数据获取失败或数据不足。" )
