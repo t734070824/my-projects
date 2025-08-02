@@ -1,4 +1,3 @@
-
 import ccxt
 import pandas as pd
 import pandas_ta as ta
@@ -58,7 +57,7 @@ class SignalGenerator:
             self.logger.debug(f"开始获取 {self.symbol} 在 {self.timeframe} 周期上的K线数据...")
             ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=self.history_limit)
             if not ohlcv:
-                self.logger.warning("API未返回任何K线数据。")
+                self.logger.warning("API未返回任何K线数据。" )
                 return pd.DataFrame()
 
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -70,7 +69,7 @@ class SignalGenerator:
             
             df.dropna(subset=numeric_cols, inplace=True)
 
-            self.logger.debug(f"成功获取并清洗了 {len(df)} 条K线数据。")
+            self.logger.debug(f"成功获取并清洗了 {len(df)} 条K线数据。" )
             return df
         except Exception as e:
             self.logger.error(f"数据获取或处理失败: {e}", exc_info=True)
@@ -97,7 +96,7 @@ class SignalGenerator:
         except Exception as e:
             self.logger.error(f"技术指标计算过程中发生未知异常: {e}", exc_info=True)
         
-        self.logger.debug("技术指标计算完成。")
+        self.logger.debug("技术指标计算完成。" )
         return df
 
     def _apply_scoring_logic(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -106,15 +105,15 @@ class SignalGenerator:
         """
         missing_cols = [col for col in self.required_columns if col not in df.columns]
         if missing_cols:
-            self.logger.warning(f"评分中止：缺少必要的指标列: {missing_cols}。")
+            self.logger.warning(f"评分中止：缺少必要的指标列: {missing_cols}。" )
             return {}
 
         if len(df) < 2:
-            self.logger.warning("数据行数不足，无法安全地进行评分。")
+            self.logger.warning("数据行数不足，无法安全地进行评分。" )
             return {}
 
         latest = df.iloc[-2]
-        self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。")
+        self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。" )
 
         scores = {'trend': 0, 'momentum': 0, 'volatility': 0, 'volume': 0}
         reasons = []
@@ -148,7 +147,7 @@ class SignalGenerator:
         elif total_score <= -3: signal = "STRONG_SELL"
         elif total_score < 0: signal = "WEAK_SELL"
 
-        self.logger.debug("评分逻辑应用完成。")
+        self.logger.debug("评分逻辑应用完成。" )
         return {
             "timestamp": latest['timestamp'], "total_score": total_score, "signal": signal,
             "scores_breakdown": scores, "reasons": reasons
@@ -161,7 +160,7 @@ class SignalGenerator:
         self.logger.info("开始生成信号...")
         df = self._fetch_data()
         if df.empty:
-            self.logger.warning("数据为空，中止信号生成。 \n")
+            self.logger.warning("数据为空，中止信号生成。\n")
             return {"error": "无法获取或处理K线数据"}
 
         df_with_indicators = self._calculate_indicators(df)
@@ -171,45 +170,58 @@ class SignalGenerator:
         if final_signal:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
         else:
-            self.logger.warning("信号生成失败，已中止。")
+            self.logger.warning("信号生成失败，已中止。" )
 
         return final_signal
 
 # --- 使用示例：多时间周期分析框架 ---
 if __name__ == '__main__':
     PROXY = 'http://127.0.0.1:10809'  # <-- 在这里修改您的代理, 如果不需要代理，请设置为 None
-    SYMBOL = 'BTC/USDT'
+    
+    # --- 关键修改：定义一个要分析的交易对列表 ---
+    SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
 
-    logging.info("--- 1. 分析战略层面 (日线图) ---")
-    daily_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='1d', proxy=PROXY)
-    daily_analysis = daily_signal_gen.generate_signal()
-    if daily_analysis and 'error' not in daily_analysis:
-        # --- 关键修复：在json.dumps中添加 ensure_ascii=False ---
-        daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
-        logging.info(f"日线分析结果: \n{daily_analysis_str}")
+    # --- 关键修改：遍历列表，对每个交易对执行分析 ---
+    for symbol in SYMBOLS_TO_ANALYZE:
+        logging.info(f"================== 开始分析: {symbol} ==================")
         
-        is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
-        long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
-        logging.info(f"长期趋势判断: {long_term_direction}")
+        # 1. 战略层面：使用日线图 (1d) 判断牛熊大环境
+        logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")
+        daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', proxy=PROXY)
+        daily_analysis = daily_signal_gen.generate_signal()
+        
+        if daily_analysis and 'error' not in daily_analysis:
+            daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
+            logging.info(f"[{symbol}] 日线分析结果: \n{daily_analysis_str}")
+            
+            is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
+            long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
+            logging.info(f"[{symbol}] 长期趋势判断: {long_term_direction}")
 
-        logging.info("--- 2. 分析战术层面 (4小时图) ---")
-        h4_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='4h', proxy=PROXY)
-        h4_analysis = h4_signal_gen.generate_signal()
-        if h4_analysis and 'error' not in h4_analysis:
-            # --- 关键修复：在json.dumps中添加 ensure_ascii=False ---
-            h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
-            logging.info(f"4小时线分析结果: \n{h4_analysis_str}")
-            trade_signal = h4_analysis.get('signal', 'NEUTRAL')
+            # 2. 战术层面：使用4小时图 (4h) 寻找具体的交易机会
+            logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
+            h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=PROXY)
+            h4_analysis = h4_signal_gen.generate_signal()
+            
+            if h4_analysis and 'error' not in h4_analysis:
+                h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
+                logging.info(f"[{symbol}] 4小时线分析结果: \n{h4_analysis_str}")
+                trade_signal = h4_analysis.get('signal', 'NEUTRAL')
 
-            logging.info("--- 3. 最终决策 ---")
-            final_decision = "HOLD"
-            if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
-                final_decision = "EXECUTE_LONG"
-                logging.warning(f"决策: {final_decision} - 原因: 长期趋势看多，且短期出现买入信号。")
-            elif not is_long_term_bullish and trade_signal in ['STRONG_SELL', 'WEAK_SELL']:
-                final_decision = "EXECUTE_SHORT"
-                logging.warning(f"决策: {final_decision} - 原因: 长期趋势看空/震荡，且短期出现卖出信号。")
+                # 3. 最终决策
+                logging.info(f"--- 3. [{symbol}] 最终决策 ---")
+                final_decision = "HOLD"
+                if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
+                    final_decision = "EXECUTE_LONG"
+                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看多，且短期出现买入信号。" )
+                elif not is_long_term_bullish and trade_signal in ['STRONG_SELL', 'WEAK_SELL']:
+                    final_decision = "EXECUTE_SHORT"
+                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看空/震荡，且短期出现卖出信号。" )
+                else:
+                    logging.info(f"决策: {final_decision} - 原因: [{symbol}] 长短期方向冲突或信号不明 ({long_term_direction} vs {trade_signal})。建议观望。" )
             else:
-                logging.info(f"决策: {final_decision} - 原因: 长短期方向冲突或信号不明 ({long_term_direction} vs {trade_signal})。建议观望。")
-    else:
-        logging.error("无法完成分析，因为在战略层面(日线)数据获取失败或数据不足。")
+                logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。" )
+        else:
+            logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。" )
+            
+        logging.info(f"================== 完成分析: {symbol} ==================\n")
