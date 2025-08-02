@@ -246,8 +246,8 @@ def print_pnl_statistics() -> None:
     
     print("\n=== 盈亏统计 ===")
     print(f"当前盈亏: {pnl_stats['current_pnl']:.2f}U")
-    print(f"最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})")
-    print(f"最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})")
+    print(f"最高盈亏: {pnl_stats['max_pnl']:.2f}U ({pnl_stats['max_pnl_time']})" )
+    print(f"最低盈亏: {pnl_stats['min_pnl']:.2f}U ({pnl_stats['min_pnl_time']})" )
     print(f"平均盈亏: {pnl_stats['average_pnl']:.2f}U")
     print(f"记录数量: {pnl_stats['total_records']}条")
 
@@ -407,4 +407,3 @@ def record_pnl_only() -> None:
         record_pnl(account_info)
     except Exception as e:
         print(f"记录盈亏失败: {e}")
-
