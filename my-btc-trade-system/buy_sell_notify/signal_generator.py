@@ -16,6 +16,7 @@ logging.basicConfig(
 class SignalGenerator:
     """
     一个多维度、基于评分的交易信号生成器。
+    新增了资金费率、ADX、一目均衡表等指标，以提供更全面的市场分析。
     """
 
     def __init__(self, symbol: str, timeframe: str = '4h', proxy: Optional[str] = None):
@@ -46,7 +47,9 @@ class SignalGenerator:
             'MACD_12_26_9', 'MACDs_12_26_9',
             'RSI_14',
             'BBU_20_2.0', 'BBL_20_2.0',
-            'VOL_SMA_20'
+            'VOL_SMA_20',
+            'ADX_14',       # ADX
+            'ISA_9', 'ISB_26' # 一目均衡表的云层边界
         ]
 
     def _fetch_data(self) -> pd.DataFrame:
@@ -57,7 +60,7 @@ class SignalGenerator:
             self.logger.debug(f"开始获取 {self.symbol} 在 {self.timeframe} 周期上的K线数据...")
             ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=self.history_limit)
             if not ohlcv:
-                self.logger.warning("API未返回任何K线数据。" )
+                self.logger.warning("API未返回任何K线数据。")
                 return pd.DataFrame()
 
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -69,7 +72,7 @@ class SignalGenerator:
             
             df.dropna(subset=numeric_cols, inplace=True)
 
-            self.logger.debug(f"成功获取并清洗了 {len(df)} 条K线数据。" )
+            self.logger.debug(f"成功获取并清洗了 {len(df)} 条K线数据。")
             return df
         except Exception as e:
             self.logger.error(f"数据获取或处理失败: {e}", exc_info=True)
@@ -84,70 +87,88 @@ class SignalGenerator:
             df.ta.strategy(ta.Strategy(
                 name="Comprehensive_Strategy",
                 ta=[
-                    {"kind": "sma", "length": 20}, 
-                    {"kind": "sma", "length": 50}, 
-                    {"kind": "sma", "length": 200},
-                    {"kind": "macd"}, 
-                    {"kind": "rsi"}, 
-                    {"kind": "bbands", "length": 20},
+                    {"kind": "sma", "length": 20}, {"kind": "sma", "length": 50}, {"kind": "sma", "length": 200},
+                    {"kind": "macd"}, {"kind": "rsi"}, {"kind": "bbands", "length": 20},
+                    {"kind": "adx"}, {"kind": "ichimoku"},
                     {"kind": "sma", "close": "volume", "length": 20, "prefix": "VOL"}
                 ]
             ))
         except Exception as e:
             self.logger.error(f"技术指标计算过程中发生未知异常: {e}", exc_info=True)
         
-        self.logger.debug("技术指标计算完成。" )
+        self.logger.debug("技术指标计算完成。")
         return df
 
-    def _apply_scoring_logic(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _apply_scoring_logic(self, df: pd.DataFrame, funding_rate_data: Optional[Dict] = None) -> Dict[str, Any]:
         """
         应用多维度评分逻辑，生成最终信号。
         """
         missing_cols = [col for col in self.required_columns if col not in df.columns]
         if missing_cols:
-            self.logger.warning(f"评分中止：缺少必要的指标列: {missing_cols}。" )
+            self.logger.warning(f"评分中止：缺少必要的指标列: {missing_cols}。")
             return {}
 
         if len(df) < 2:
-            self.logger.warning("数据行数不足，无法安全地进行评分。" )
+            self.logger.warning("数据行数不足，无法安全地进行评分。")
             return {}
 
         latest = df.iloc[-2]
-        self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。" )
+        self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。")
 
-        scores = {'trend': 0, 'momentum': 0, 'volatility': 0, 'volume': 0}
+        scores = {'trend': 0, 'momentum': 0, 'sentiment': 0}
         reasons = []
 
+        # --- 1. 趋势判断 (Trend Analysis) ---
+        # MA交叉 (权重: +/- 2)
         if latest['SMA_50'] > latest['SMA_200']:
             scores['trend'] += 2; reasons.append("[趋势: 看多] 黄金交叉 (MA50 > MA200)")
         elif latest['SMA_50'] < latest['SMA_200']:
             scores['trend'] -= 2; reasons.append("[趋势: 看空] 死亡交叉 (MA50 < MA200)")
-        if latest['close'] > latest['SMA_20']:
-            scores['trend'] += 1; reasons.append("[趋势: 看多] 价格位于MA20之上")
-        else:
-            scores['trend'] -= 1; reasons.append("[趋势: 看空] 价格位于MA20之下")
-        if latest['MACD_12_26_9'] > latest['MACDs_12_26_9'] and latest['MACD_12_26_9'] > 0:
-            scores['trend'] += 1; reasons.append("[趋势: 看多] MACD在零轴上方金叉")
-        elif latest['MACD_12_26_9'] < latest['MACDs_12_26_9'] and latest['MACD_12_26_9'] < 0:
-            scores['trend'] -= 1; reasons.append("[趋势: 看空] MACD在零轴下方死叉")
+        
+        # 价格与云层关系 (权重: +/- 1)
+        if latest['close'] > latest['ISA_9'] and latest['close'] > latest['ISB_26']:
+            scores['trend'] += 1; reasons.append("[趋势: 看多] 价格位于一目均衡表云层之上")
+        elif latest['close'] < latest['ISA_9'] and latest['close'] < latest['ISB_26']:
+            scores['trend'] -= 1; reasons.append("[趋势: 看空] 价格位于一目均衡表云层之下")
+
+        # ADX 趋势强度 (不直接加分，仅作为判断依据)
+        if latest['ADX_14'] > 25:
+            reasons.append(f"[趋势: 确认] ADX ({latest['ADX_14']:.2f}) > 25，趋势强劲")
+        elif latest['ADX_14'] < 20:
+            reasons.append(f"[趋势: 警告] ADX ({latest['ADX_14']:.2f}) < 20，无明确趋势")
+
+        # --- 2. 动量与强度 (Momentum & Strength) ---
         rsi = latest['RSI_14']
-        if rsi > 60: scores['momentum'] += 1; reasons.append(f"[动量: 看多] RSI ({rsi:.2f}) 强势")
-        elif rsi < 40: scores['momentum'] -= 1; reasons.append(f"[动量: 看空] RSI ({rsi:.2f}) 弱势")
-        else: reasons.append(f"[动量: 中性] RSI ({rsi:.2f}) 观望")
-        if latest['close'] > latest['BBU_20_2.0']: scores['volatility'] += 1; reasons.append("[波动性: 看多] 价格突破布林带上轨")
-        elif latest['close'] < latest['BBL_20_2.0']: scores['volatility'] -= 1; reasons.append("[波动性: 看空] 价格跌破布林带下轨")
-        if latest['volume'] > latest['VOL_SMA_20']:
-            if latest['close'] > latest['open']: scores['volume'] += 1; reasons.append("[成交量: 看多] 放量上涨")
-            else: scores['volume'] -= 1; reasons.append("[成交量: 看空] 放量下跌")
-        else: reasons.append("[成交量: 中性] 缩量整理")
+        if rsi > 65:
+            scores['momentum'] += 1; reasons.append(f"[动量: 看多] RSI ({rsi:.2f}) 强势超买")
+        elif rsi < 35:
+            scores['momentum'] -= 1; reasons.append(f"[动量: 看空] RSI ({rsi:.2f}) 弱势超卖")
+        else:
+            reasons.append(f"[动量: 中性] RSI ({rsi:.2f}) 观望")
+
+        # --- 3. 市场情绪 (Market Sentiment) ---
+        if funding_rate_data and 'fundingRate' in funding_rate_data:
+            rate = float(funding_rate_data['fundingRate'])
+            if rate > 0.0005: # 资金费率过高，市场贪婪
+                scores['sentiment'] -= 1; reasons.append(f"[情绪: 看空] 资金费率过高 ({rate:.4f})，市场贪婪")
+            elif rate < -0.0005: # 资金费率过低，市场恐慌
+                scores['sentiment'] += 1; reasons.append(f"[情绪: 看多] 资金费率过低 ({rate:.4f})，市场恐慌")
+            else:
+                reasons.append(f"[情绪: 中性] 资金费率 ({rate:.4f}) 正常")
+
+        # --- 综合评分 ---
         total_score = sum(scores.values())
         signal = "NEUTRAL"
-        if total_score >= 3: signal = "STRONG_BUY"
-        elif total_score > 0: signal = "WEAK_BUY"
-        elif total_score <= -3: signal = "STRONG_SELL"
-        elif total_score < 0: signal = "WEAK_SELL"
+        if total_score >= 3:
+            signal = "STRONG_BUY"
+        elif total_score > 0:
+            signal = "WEAK_BUY"
+        elif total_score <= -3:
+            signal = "STRONG_SELL"
+        elif total_score < 0:
+            signal = "WEAK_SELL"
 
-        self.logger.debug("评分逻辑应用完成。" )
+        self.logger.debug("评分逻辑应用完成。")
         return {
             "timestamp": latest['timestamp'], "total_score": total_score, "signal": signal,
             "scores_breakdown": scores, "reasons": reasons
@@ -160,68 +181,21 @@ class SignalGenerator:
         self.logger.info("开始生成信号...")
         df = self._fetch_data()
         if df.empty:
-            self.logger.warning("数据为空，中止信号生成。\n")
+            self.logger.warning("数据为空，中止信号生成。")
             return {"error": "无法获取或处理K线数据"}
 
+        funding_rate_data = None
+        try:
+            funding_rate_data = self.exchange.fetch_funding_rate(self.symbol)
+        except Exception as e:
+            self.logger.warning(f"获取资金费率失败: {e}")
+
         df_with_indicators = self._calculate_indicators(df)
-        
-        final_signal = self._apply_scoring_logic(df_with_indicators)
+        final_signal = self._apply_scoring_logic(df_with_indicators, funding_rate_data)
         
         if final_signal:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
         else:
-            self.logger.warning("信号生成失败，已中止。" )
+            self.logger.warning("信号生成失败，已中止。")
 
         return final_signal
-
-# --- 使用示例：多时间周期分析框架 ---
-if __name__ == '__main__':
-    PROXY = 'http://127.0.0.1:10809'  # <-- 在这里修改您的代理, 如果不需要代理，请设置为 None
-    
-    # --- 关键修改：定义一个要分析的交易对列表 ---
-    SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
-
-    # --- 关键修改：遍历列表，对每个交易对执行分析 ---
-    for symbol in SYMBOLS_TO_ANALYZE:
-        logging.info(f"================== 开始分析: {symbol} ==================")
-        
-        # 1. 战略层面：使用日线图 (1d) 判断牛熊大环境
-        logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")
-        daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', proxy=PROXY)
-        daily_analysis = daily_signal_gen.generate_signal()
-        
-        if daily_analysis and 'error' not in daily_analysis:
-            daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
-            logging.info(f"[{symbol}] 日线分析结果: \n{daily_analysis_str}")
-            
-            is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
-            long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
-            logging.info(f"[{symbol}] 长期趋势判断: {long_term_direction}")
-
-            # 2. 战术层面：使用4小时图 (4h) 寻找具体的交易机会
-            logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
-            h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=PROXY)
-            h4_analysis = h4_signal_gen.generate_signal()
-            
-            if h4_analysis and 'error' not in h4_analysis:
-                h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
-                logging.info(f"[{symbol}] 4小时线分析结果: \n{h4_analysis_str}")
-                trade_signal = h4_analysis.get('signal', 'NEUTRAL')
-
-                # 3. 最终决策
-                logging.info(f"--- 3. [{symbol}] 最终决策 ---")
-                final_decision = "HOLD"
-                if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
-                    final_decision = "EXECUTE_LONG"
-                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看多，且短期出现买入信号。" )
-                elif not is_long_term_bullish and trade_signal in ['STRONG_SELL', 'WEAK_SELL']:
-                    final_decision = "EXECUTE_SHORT"
-                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看空/震荡，且短期出现卖出信号。" )
-                else:
-                    logging.info(f"决策: {final_decision} - 原因: [{symbol}] 长短期方向冲突或信号不明 ({long_term_direction} vs {trade_signal})。建议观望。" )
-            else:
-                logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。" )
-        else:
-            logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。" )
-            
-        logging.info(f"================== 完成分析: {symbol} ==================\n")
