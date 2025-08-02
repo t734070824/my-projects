@@ -1,3 +1,4 @@
+
 import ccxt
 import pandas as pd
 import pandas_ta as ta
@@ -119,19 +120,16 @@ class SignalGenerator:
         reasons = []
 
         # --- 1. 趋势判断 (Trend Analysis) ---
-        # MA交叉 (权重: +/- 2)
         if latest['SMA_50'] > latest['SMA_200']:
             scores['trend'] += 2; reasons.append("[趋势: 看多] 黄金交叉 (MA50 > MA200)")
         elif latest['SMA_50'] < latest['SMA_200']:
             scores['trend'] -= 2; reasons.append("[趋势: 看空] 死亡交叉 (MA50 < MA200)")
         
-        # 价格与云层关系 (权重: +/- 1)
         if latest['close'] > latest['ISA_9'] and latest['close'] > latest['ISB_26']:
             scores['trend'] += 1; reasons.append("[趋势: 看多] 价格位于一目均衡表云层之上")
         elif latest['close'] < latest['ISA_9'] and latest['close'] < latest['ISB_26']:
             scores['trend'] -= 1; reasons.append("[趋势: 看空] 价格位于一目均衡表云层之下")
 
-        # ADX 趋势强度 (不直接加分，仅作为判断依据)
         if latest['ADX_14'] > 25:
             reasons.append(f"[趋势: 确认] ADX ({latest['ADX_14']:.2f}) > 25，趋势强劲")
         elif latest['ADX_14'] < 20:
@@ -149,12 +147,14 @@ class SignalGenerator:
         # --- 3. 市场情绪 (Market Sentiment) ---
         if funding_rate_data and 'fundingRate' in funding_rate_data:
             rate = float(funding_rate_data['fundingRate'])
-            if rate > 0.0005: # 资金费率过高，市场贪婪
-                scores['sentiment'] -= 1; reasons.append(f"[情绪: 看空] 资金费率过高 ({rate:.4f})，市场贪婪")
-            elif rate < -0.0005: # 资金费率过低，市场恐慌
-                scores['sentiment'] += 1; reasons.append(f"[情绪: 看多] 资金费率过低 ({rate:.4f})，市场恐慌")
+            # --- 关键修复 1: 调整判断阈值 ---
+            if rate > 0.0002:
+                scores['sentiment'] -= 1; reasons.append(f"[情绪: 看空] 资金费率过高 ({rate:.6f})，市场贪婪")
+            elif rate < -0.0002:
+                scores['sentiment'] += 1; reasons.append(f"[情绪: 看多] 资金费率过低 ({rate:.6f})，市场恐慌")
             else:
-                reasons.append(f"[情绪: 中性] 资金费率 ({rate:.4f}) 正常")
+                # --- 关键修复 2: 修正日志格式 ---
+                reasons.append(f"[情绪: 中性] 资金费率 ({rate:.6f}) 正常")
 
         # --- 综合评分 ---
         total_score = sum(scores.values())
@@ -167,6 +167,9 @@ class SignalGenerator:
             signal = "STRONG_SELL"
         elif total_score < 0:
             signal = "WEAK_SELL"
+
+        score_details = f"趋势={scores['trend']} | 动量={scores['momentum']} | 情绪={scores['sentiment']}"
+        self.logger.info(f"分数计算详情: {score_details} -> 总分: {total_score}")
 
         self.logger.debug("评分逻辑应用完成。")
         return {
@@ -186,15 +189,17 @@ class SignalGenerator:
 
         funding_rate_data = None
         try:
-            funding_rate_data = self.exchange.fetch_funding_rate(self.symbol)
+            api_symbol = self.symbol.replace('/', '')
+            funding_rate_data = self.exchange.fetch_funding_rate(api_symbol)
+            # --- 最终诊断步骤：使用CRITICAL级别打印返回的原始数据 ---
         except Exception as e:
-            self.logger.warning(f"获取资金费率失败: {e}")
+            self.logger.error(f"获取资金费率时发生致命错误: {e}", exc_info=True)
 
         df_with_indicators = self._calculate_indicators(df)
         final_signal = self._apply_scoring_logic(df_with_indicators, funding_rate_data)
         
         if final_signal:
-            self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
+            self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}")
         else:
             self.logger.warning("信号生成失败，已中止。")
 
