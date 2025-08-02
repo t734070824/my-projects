@@ -196,15 +196,60 @@ class SignalGenerator:
         
         return final_signal
 
-# --- 使用示例 ---
+# --- 使用示例：多时间周期分析框架 ---
 if __name__ == '__main__':
-    # 创建一个BTC/USDT在4小时图上的信号生成器实例
-    btc_signal_gen = SignalGenerator(symbol='BTC/USDT', timeframe='4h')
-    
-    # 生成信号
-    signal_data = btc_signal_gen.generate_signal()
-
-    # 打印结果
     import json
-    print(json.dumps(signal_data, indent=4, default=str))
+
+    # 交易对
+    SYMBOL = 'BTC/USDT'
+
+    # 1. 战略层面：使用日线图 (1d) 判断牛熊大环境
+    print("--- 1. 分析战略层面 (日线图) ---")
+    daily_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='1d')
+    daily_analysis = daily_signal_gen.generate_signal()
+    print(json.dumps(daily_analysis, indent=4, default=str))
+
+    # 从日线分析中提取长期趋势判断
+    # 我们定义总分大于0为长期看多，否则为长期看空或震荡
+    is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
+    long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
+    print(f"\n长期趋势判断: {long_term_direction}\n")
+
+    # 2. 战术层面：使用4小时图 (4h) 寻找具体的交易机会
+    print("--- 2. 分析战术层面 (4小时图) ---")
+    h4_signal_gen = SignalGenerator(symbol=SYMBOL, timeframe='4h')
+    h4_analysis = h4_signal_gen.generate_signal()
+    print(json.dumps(h4_analysis, indent=4, default=str))
+
+    # 从4小时分析中提取短期交易信号
+    trade_signal = h4_analysis.get('signal', 'NEUTRAL')
+
+    # 3. 决策逻辑：只有当长短期方向一致时，才产生最终交易决策
+    print("\n--- 3. 最终决策 ---")
+    final_decision = "HOLD"  # 默认决策为持有/观望
+
+    if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
+        final_decision = "EXECUTE_LONG"
+        print(f"决策: {final_decision}")
+        print("原因: 长期趋势看多，且短期出现买入信号。准备执行做多策略。\n")
+    
+    elif not is_long_term_bullish and trade_signal in ['STRONG_SELL', 'WEAK_SELL']:
+        final_decision = "EXECUTE_SHORT"
+        print(f"决策: {final_decision}")
+        print("原因: 长期趋势看空/震荡，且短期出现卖出信号。准备执行做空策略。\n")
+        
+    else:
+        print(f"决策: {final_decision}")
+        print(f"原因: 长短期方向冲突或信号不明。长期方向: {long_term_direction}, 短期信号: {trade_signal}。建议观望。\n")
+
+    # 在真实的自动化交易系统中，这里的 print 语句将被替换为
+    # 调用风险管理、仓位计算和订单执行的模块。
+    #
+    # 例如:
+    # if final_decision == "EXECUTE_LONG":
+    #     risk_manager.calculate_position_size(...)
+    #     order_executor.place_long_order(...)
+    # elif final_decision == "EXECUTE_SHORT":
+    #     ...
+
 
