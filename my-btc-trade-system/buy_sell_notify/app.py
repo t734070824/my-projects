@@ -25,9 +25,8 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         logger.error(f"无法管理 {symbol} 的虚拟交易：缺少价格、ATR或余额信息。")
         return
 
-    # --- 检查是否存在当前交易对的持仓 (关键修复：统一合约名称格式) ---
-    normalized_symbol = symbol.replace('/', '')
-    existing_position = next((p for p in open_positions if p['symbol'] == normalized_symbol), None)
+    # --- 检查是否存在当前交易对的持仓 (关键修复：处理':USDT'后缀) ---
+    existing_position = next((p for p in open_positions if p['symbol'].split(':')[0] == symbol), None)
     
     trade_config = config.VIRTUAL_TRADE_CONFIG
     atr_multiplier = trade_config["ATR_MULTIPLIER_FOR_SL"]
