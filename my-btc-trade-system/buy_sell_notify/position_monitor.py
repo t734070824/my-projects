@@ -23,9 +23,7 @@ def find_associated_stop_loss_order(open_orders, position):
         if (
             order['symbol'] == position_symbol and
             order['side'] == sl_side and
-            order['type'] in ['stop', 'stop_market'] and
-            # 检查数量是否足够接近 (处理精度问题)
-            math.isclose(float(order['amount']), position_size)
+            order['type'] in ['stop', 'stop_market']
         ):
             return order # 找到匹配的止损单
     return None # 未找到
