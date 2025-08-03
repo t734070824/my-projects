@@ -36,10 +36,15 @@ def run_multi_symbol_analysis():
         logging.info(f"================== 开始分析: {symbol} ==================")
         
         # 为当前交易对获取ATR信息
-        logging.info(f"--- 0. [{symbol}] 获取ATR信息 (周期: {config.ATR_TIMEFRAME}, 长度: {config.ATR_LENGTH}) ---")
+        logging.info(f"--- 0. [{symbol}] 获取ATR信息 ---")
         atr_info = get_atr_info(symbol, exchange)
         if 'error' in atr_info:
             logging.warning(f"无法获取 [{symbol}] 的ATR信息: {atr_info['error']}，将继续分析。")
+        else:
+            atr_val = atr_info.get('atr')
+            tf = atr_info.get('timeframe')
+            length = atr_info.get('length')
+            logging.info(f"[{symbol}] 的ATR(周期:{tf}, 长度:{length})值为: {atr_val}")
 
         # 1. 战略层面：日线图 (1d)
         logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")

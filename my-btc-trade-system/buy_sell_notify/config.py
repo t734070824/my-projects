@@ -24,6 +24,13 @@ RUN_AT_MINUTE = ":01"
 HISTORY_LIMIT = 400
 
 # --- Indicator Settings ---
-# Timeframe and length for ATR calculation
-ATR_TIMEFRAME = '1d'
-ATR_LENGTH = 14
+# ATR (Average True Range) settings.
+# You can define specific timeframes and lengths for each symbol.
+# A "DEFAULT" key is required as a fallback for symbols not explicitly listed.
+ATR_CONFIG = {
+    "DEFAULT": {"timeframe": "1d", "length": 14},
+    "BTC/USDT": {"timeframe": "4h", "length": 14},
+    "ETH/USDT": {"timeframe": "4h", "length": 20},
+    # You can add other symbols here, e.g.:
+    "SOL/USDT": {"timeframe": "4h", "length": 20},
+}

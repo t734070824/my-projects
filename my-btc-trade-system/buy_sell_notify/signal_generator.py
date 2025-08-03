@@ -59,19 +59,21 @@ def get_account_status(exchange: ccxt.Exchange) -> Dict[str, Any]:
         return {"error": str(e)}
 
 def get_atr_info(symbol: str, exchange: ccxt.Exchange) -> Dict[str, Any]:
-    """获取指定交易对的ATR（平均真实波幅）值。"""
+    """获取指定交易对的ATR（平均真实波幅）值，使用config中定义的参数。"""
     logger = logging.getLogger("ATR_Fetcher")
-    logger.debug(f"开始获取 {symbol} 的ATR信息...")
+    
+    # 1. 从配置读取参数
+    atr_params = config.ATR_CONFIG.get(symbol, config.ATR_CONFIG["DEFAULT"])
+    timeframe = atr_params["timeframe"]
+    length = atr_params["length"]
+    
+    logger.debug(f"开始获取 {symbol} 的ATR信息 (周期: {timeframe}, 长度: {length})...")
     try:
-        # 1. 从配置读取参数
-        timeframe = config.ATR_TIMEFRAME
-        length = config.ATR_LENGTH
-        
-        # 2. 获取K线数据 (需要比ATR长度更多的数据来确保计算准确)
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=length + 10)
-        if not ohlcv:
-            logger.warning(f"无法获取 {symbol} 在 {timeframe} 的K线数据。")
-            return {"error": "No OHLCV data"}
+        # 2. 获取K线数据 (获取更多数据以保证ATR计算的准确性)
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=200)
+        if not ohlcv or len(ohlcv) < length:
+            logger.warning(f"无法获取足够的 {symbol} 在 {timeframe} 的K线数据。")
+            return {"error": "Not enough OHLCV data"}
 
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         for col in ['open', 'high', 'low', 'close']:
@@ -86,11 +88,14 @@ def get_atr_info(symbol: str, exchange: ccxt.Exchange) -> Dict[str, Any]:
             logger.error(f"无法计算 {symbol} 的ATR值。")
             return {"error": "ATR calculation failed"}
             
-        # 返回倒数第二个值，因为它对应的是最新一根完整K线的ATR
         latest_atr = df[atr_col_name].iloc[-2]
         
         logger.debug(f"成功获取 {symbol} 的ATR值为: {latest_atr}")
-        return {"atr": round(latest_atr, 4)}
+        return {
+            "atr": round(latest_atr, 4),
+            "timeframe": timeframe,
+            "length": length
+        }
 
     except Exception as e:
         logger.error(f"获取 {symbol} 的ATR信息时发生错误: {e}", exc_info=True)
