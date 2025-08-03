@@ -222,7 +222,7 @@ class SignalGenerator:
 
         return {
             "timestamp": latest['timestamp'], "total_score": total_score, "signal": signal,
-            "scores_breakdown": scores, "reasons": reasons
+            "scores_breakdown": scores, "reasons": reasons, "close_price": latest['close']
         }
 
     def generate_signal(self, account_status: Optional[Dict] = None, atr_info: Optional[Dict] = None) -> Dict[str, Any]:

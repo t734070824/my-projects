@@ -8,6 +8,64 @@ import ccxt
 import config
 from signal_generator import SignalGenerator, get_account_status, get_atr_info
 
+def log_virtual_trade(symbol, decision, analysis_data):
+    """根据分析数据计算并记录一笔虚拟交易的详细信息。"""
+    logger = logging.getLogger("VirtualTrader")
+    
+    # --- 提取所需数据 ---
+    entry_price = analysis_data.get('close_price')
+    atr = analysis_data.get('atr_info', {}).get('atr')
+    available_balance_str = analysis_data.get('account_status', {}).get('usdt_balance', {}).get('availableBalance')
+    
+    if not all([entry_price, atr, available_balance_str]):
+        logger.error(f"无法为 {symbol} 创建虚拟交易：缺少入场价、ATR或账户余额信息。")
+        return
+        
+    available_balance = float(available_balance_str)
+    
+    # --- 读取交易配置 ---
+    trade_config = config.VIRTUAL_TRADE_CONFIG
+    risk_per_trade = trade_config["RISK_PER_TRADE_PERCENT"] / 100
+    atr_multiplier = trade_config["ATR_MULTIPLIER_FOR_SL"]
+    rr_ratio = trade_config["RISK_REWARD_RATIO"]
+
+    # --- 计算止损、止盈和仓位大小 ---
+    stop_loss_distance = atr * atr_multiplier
+    
+    if "LONG" in decision:
+        stop_loss_price = entry_price - stop_loss_distance
+        take_profit_price = entry_price + (stop_loss_distance * rr_ratio)
+    elif "SHORT" in decision:
+        stop_loss_price = entry_price + stop_loss_distance
+        take_profit_price = entry_price - (stop_loss_distance * rr_ratio)
+    else:
+        return # 非交易决策
+
+    # 计算仓位大小
+    risk_amount_usd = available_balance * risk_per_trade
+    position_size_coin = risk_amount_usd / stop_loss_distance
+    position_size_usd = position_size_coin * entry_price
+
+    # --- 记录日志 ---
+    trade_log_message = f"""
+    ------------------------------------------------------------
+    |                 VIRTUAL TRADE ALERT                      |
+    ------------------------------------------------------------
+    | Symbol:           {symbol}
+    | Decision:         {decision}
+    |
+    | Entry Price:      {entry_price:,.4f}
+    | Stop Loss:        {stop_loss_price:,.4f} (Distance: {stop_loss_distance:,.4f})
+    | Take Profit:      {take_profit_price:,.4f} (RR Ratio: {rr_ratio})
+    |
+    | Account Balance:  {available_balance:,.2f} USDT
+    | Risk Amount:      {risk_amount_usd:,.2f} USDT ({risk_per_trade:.2%})
+    | Position Size:    {position_size_coin:,.4f} {symbol.split('/')[0]} ({position_size_usd:,.2f} USDT)
+    ------------------------------------------------------------
+    """
+    logger.warning(trade_log_message)
+
+
 # --- 核心分析函数 ---
 def run_multi_symbol_analysis():
     """遍历多个交易对，执行三重时间周期信号分析 (1d, 4h, 1h)。"""
@@ -91,14 +149,17 @@ def run_multi_symbol_analysis():
         if is_long_term_bullish and is_mid_term_bullish and h1_signal in ['STRONG_BUY', 'WEAK_BUY']:
             final_decision = "EXECUTE_LONG"
             logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看多，且1h出现买入信号。")
+            log_virtual_trade(symbol, final_decision, h1_analysis)
         elif not is_long_term_bullish and not is_mid_term_bullish and h1_signal in ['STRONG_SELL', 'WEAK_SELL']:
             final_decision = "EXECUTE_SHORT"
             logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看空，且1h出现卖出信号。")
+            log_virtual_trade(symbol, final_decision, h1_analysis)
         else:
             reason = f"1d({long_term_direction}) | 4h({'看多' if is_mid_term_bullish else '看空'}) | 1h({h1_signal})"
             logging.info(f"决策: {final_decision} - 原因: [{symbol}] 时间周期信号冲突 ({reason})。建议观望。")
             
         logging.info(f"================== 完成分析: {symbol} ==================\n")
+
 
 
 # --- 主程序入口 ---

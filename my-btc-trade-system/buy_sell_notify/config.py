@@ -32,5 +32,14 @@ ATR_CONFIG = {
     "BTC/USDT": {"timeframe": "4h", "length": 14},
     "ETH/USDT": {"timeframe": "4h", "length": 20},
     # You can add other symbols here, e.g.:
-    "SOL/USDT": {"timeframe": "4h", "length": 20},
+        "SOL/USDT": {"timeframe": "4h", "length": 20},
 }
+
+# --- Virtual Trading Settings ---
+# Settings for calculating virtual trade parameters.
+VIRTUAL_TRADE_CONFIG = {
+    "RISK_PER_TRADE_PERCENT": 2.0,  # Risk 1% of the available balance per trade
+    "ATR_MULTIPLIER_FOR_SL": 2.0,   # Stop loss will be set at 2 * ATR from the entry price
+    "RISK_REWARD_RATIO": 1.5        # Take profit will be 1.5 times the stop loss distance
+}
+
