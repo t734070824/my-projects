@@ -8,7 +8,23 @@ import sys
 
 import config
 from signal_generator import SignalGenerator, get_account_status, get_atr_info
+from dingtalk_notifier import send_dingtalk_markdown
 
+# --- 新增：全局变量和自定义日志处理器 ---
+# 用于在内存中临时存储日志的列表
+ANALYSIS_LOGS = []
+
+class ListLogHandler(logging.Handler):
+    """一个非常简单的日志处理器，将每条日志记录添加到全局列表中。"""
+    def __init__(self, log_list):
+        super().__init__()
+        self.log_list = log_list
+
+    def emit(self, record):
+        # 将格式化后的消息追加到列表中
+        self.log_list.append(self.format(record))
+
+# --- 原有代码区域 (保持完全不变) ---
 def manage_virtual_trade(symbol, final_decision, analysis_data):
     """
     管理虚拟交易：根据信号开仓，或根据市场情况调整现有仓位的止损。
@@ -129,7 +145,6 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
     ------------------------------------------------------------
     """)
 
-# --- 核心分析函数 ---
 def run_multi_symbol_analysis():
     """遍历多个交易对，执行三重时间周期信号分析 (1d, 4h, 1h)。"""
     # --- 1. 初始化交易所并获取一次性数据 ---
@@ -201,7 +216,6 @@ def run_multi_symbol_analysis():
             logging.error(f"无法完成 [{symbol}] 的执行层面分析，已跳过。")
             continue
 
-
         h1_analysis_str = json.dumps(h1_analysis, indent=4, default=str, ensure_ascii=False)
         logging.info(f"[{symbol}] 1小时线分析结果: {h1_analysis_str}")
         h1_signal = h1_analysis.get('signal', 'NEUTRAL')
@@ -224,10 +238,49 @@ def run_multi_symbol_analysis():
 
         logging.info(f"================== 完成分析: {symbol} ==================\n")
 
+# --- 新增：包装器函数，用于捕获日志并发送通知 ---
+def run_analysis_and_notify():
+    """
+    一个包装器，它执行核心分析函数，捕获其所有日志输出，
+    然后将捕获的日志通过钉钉发送出去。
+    """
+    global ANALYSIS_LOGS
+    ANALYSIS_LOGS = [] # 每次运行时清空列表
+    
+    root_logger = logging.getLogger()
+    # 获取当前控制台处理器的格式器，以便我们的新处理器使用相同的格式
+    formatter = root_logger.handlers[0].formatter
+    
+    # 创建并挂载我们的自定义列表处理器
+    list_handler = ListLogHandler(ANALYSIS_LOGS)
+    list_handler.setFormatter(formatter)
+    root_logger.addHandler(list_handler)
 
+    try:
+        # 执行原始的、未经修改的分析函数
+        run_multi_symbol_analysis()
+    except Exception:
+        # 如果发生任何未捕获的异常，也将其记录下来
+        logging.error("执行分析时发生严重错误:", exc_info=True)
+    finally:
+        # --- 无论成功或失败，最后都执行 ---
+        # 1. 从系统中卸载我们的自定义处理器，避免重复记录
+        root_logger.removeHandler(list_handler)
 
+        # 2. 将收集到的日志列表合并成一个字符串
+        captured_logs = "\n".join(ANALYSIS_LOGS)
 
-# --- 主程序入口 ---
+        # 3. 发送钉钉通知
+        if captured_logs:
+            title = "每小时市场分析报告"
+            max_len = 18000 # 钉钉消息长度限制
+            if len(captured_logs) > max_len:
+                captured_logs = captured_logs[:max_len] + "\n\n... (消息过长，已被截断)"
+            
+            markdown_text = f"### **每小时市场分析报告**\n\n```\n{captured_logs}\n```"
+            send_dingtalk_markdown(title, markdown_text)
+
+# --- 主程序入口 (修改定时任务的目标) ---
 def main():
     """主函数 - 设置定时任务并启动独立监控进程"""
     # --- 配置日志以使用本地时间 ---
@@ -235,31 +288,30 @@ def main():
         fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    log_formatter.converter = time.localtime # 关键：使用本地时间
+    log_formatter.converter = time.localtime
     root_logger = logging.getLogger()
-    # 清除可能存在的旧处理器
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
-    # 添加新的控制台处理器
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.INFO)
 
-    logging.info("=== 新版交易信号分析系统启动 (主程序) ===")
+    logging.info("=== 交易信号分析系统启动 (主程序) ===")
 
     # --- 启动独立的监控脚本作为子进程 ---
     monitor_process = None
     try:
         logging.info("正在启动独立的仓位监控进程...")
-        # 使用 sys.executable 来确保子进程使用与主进程相同的 Python 解释器
         monitor_process = subprocess.Popen([sys.executable, "position_monitor.py"])
         logging.info(f"仓位监控进程已启动，PID: {monitor_process.pid}")
 
         # --- 设置并运行主分析任务的定时调度 ---
         logging.info(f"主分析任务将每小时的{config.RUN_AT_MINUTE}分执行一次分析...")
-        run_multi_symbol_analysis()
-        schedule.every().hour.at(config.RUN_AT_MINUTE).do(run_multi_symbol_analysis)
+        
+        # --- 关键修改：将定时任务的目标指向新的包装器函数 ---
+        run_analysis_and_notify() # 立即执行一次
+        schedule.every().hour.at(config.RUN_AT_MINUTE).do(run_analysis_and_notify)
         
         while True:
             schedule.run_pending()
@@ -272,10 +324,9 @@ def main():
     finally:
         if monitor_process:
             logging.info("正在终止仓位监控进程...")
-            monitor_process.terminate() # 发送终止信号
-            monitor_process.wait() # 等待进程完全终止
+            monitor_process.terminate()
+            monitor_process.wait()
             logging.info("仓位监控进程已终止。")
-
 
 if __name__ == "__main__":
     main()

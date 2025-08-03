@@ -22,9 +22,7 @@ def find_associated_stop_loss_order(open_orders, position):
         if (
             order['symbol'] == position_symbol and
             order['side'] == sl_side and
-            order['type'] in ['stop', 'stop_market'] and
-            order.get('amount') is not None and
-            math.isclose(float(order['amount']), position_size)
+            order['type'] in ['stop', 'stop_market']
         ):
             return order
     return None
