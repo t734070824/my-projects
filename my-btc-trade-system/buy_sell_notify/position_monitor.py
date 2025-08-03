@@ -1,4 +1,3 @@
-
 import time
 import logging
 import ccxt
@@ -40,7 +39,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 
     while True:
         try:
-            # 1. 获取当前真实的未平仓头寸和所有未成交订单
+            # 1. 获取当前真实的未平仓头寸
             account_status = get_account_status(exchange)
             if 'error' in account_status:
                 logger.error(f"无法获取账户状态: {account_status['error']}"); time.sleep(60); continue
@@ -49,8 +48,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
             if not open_positions:
                 logger.info("当前无持仓，等待下一轮检查..."); time.sleep(config.MONITOR_INTERVAL_SECONDS); continue
 
-            all_open_orders = exchange.fetch_open_orders()
-            logger.info(f"监控 {len(open_positions)} 个真实仓位，发现 {len(all_open_orders)} 个未结订单...")
+            logger.info(f"监控 {len(open_positions)} 个真实仓位...")
 
             # 2. 遍历所有真实持仓
             for position in open_positions:
@@ -58,8 +56,11 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
                 side = position['side']
                 entry_price = float(position['entryPrice'])
 
+                # 关键修复：只获取当前交易对的订单，避免频率超限
+                open_orders_for_symbol = exchange.fetch_open_orders(symbol)
+
                 # 核心改进：查找与该持仓关联的真实止损单
-                stop_loss_order = find_associated_stop_loss_order(all_open_orders, position)
+                stop_loss_order = find_associated_stop_loss_order(open_orders_for_symbol, position)
 
                 if not stop_loss_order:
                     logger.error(f"!!! 持仓无保护 !!! [{symbol}] {side.upper()} 仓位没有找到关联的止损订单。")
@@ -74,7 +75,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
                 # b. 获取最新的ATR信息
                 atr_info = get_atr_info(symbol, exchange)
                 if 'error' in atr_info or not atr_info.get('atr'):
-                    logger.warning(f"无法为 [{symbol}] 获取ATR，跳过追踪止损检查。" )
+                    logger.warning(f"无法为 [{symbol}] 获取ATR，跳过追踪止损检查。")
                     continue
 
                 # c. 计算新的理想止损位
@@ -110,7 +111,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
     ------------------------------------------------------------
     """)
                 else:
-                    logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。" )
+                    logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。")
 
         except ccxt.NetworkError as e:
             logger.error(f"监控时发生网络错误: {e}")
