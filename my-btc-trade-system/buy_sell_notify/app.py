@@ -25,8 +25,9 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         logger.error(f"无法管理 {symbol} 的虚拟交易：缺少价格、ATR或余额信息。")
         return
 
-    # --- 检查是否存在当前交易对的持仓 ---
-    existing_position = next((p for p in open_positions if p['symbol'] == symbol), None) 
+    # --- 检查是否存在当前交易对的持仓 (关键修复：统一合约名称格式) ---
+    normalized_symbol = symbol.replace('/', '')
+    existing_position = next((p for p in open_positions if p['symbol'] == normalized_symbol), None)
     
     trade_config = config.VIRTUAL_TRADE_CONFIG
     atr_multiplier = trade_config["ATR_MULTIPLIER_FOR_SL"]
@@ -203,7 +204,23 @@ def run_multi_symbol_analysis():
 # --- 主程序入口 ---
 def main():
     """主函数 - 设置定时任务"""
-    logging.info("=== 新版交易信号分析系统启动 ===")
+    # --- 配置日志以使用本地时间 ---
+    log_formatter = logging.Formatter(
+        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    log_formatter.converter = time.localtime # 关键：使用本地时间
+    root_logger = logging.getLogger()
+    # 清除可能存在的旧处理器
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+    # 添加新的控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    root_logger.addHandler(console_handler)
+    root_logger.setLevel(logging.INFO)
+
+    logging.info("=== 新版交易信号分析系统启动 (使用本地时间) ===")
     logging.info(f"系统将每小时的{config.RUN_AT_MINUTE}分执行一次分析...")
     
     run_multi_symbol_analysis()
@@ -221,6 +238,7 @@ def main():
         except Exception as e:
             logging.error(f"定时任务执行出错: {e}", exc_info=True)
             time.sleep(60)
+
 
 if __name__ == "__main__":
     main()

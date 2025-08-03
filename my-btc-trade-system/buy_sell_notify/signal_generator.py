@@ -6,13 +6,13 @@ import logging
 import json
 import config
 
-# 配置基础日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    encoding='utf-8'
-)
+# 日志由主程序 app.py 统一配置
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     datefmt='%Y-%m-%d %H:%M:%S',
+#     encoding='utf-8'
+# )
 
 def get_account_status(exchange: ccxt.Exchange) -> Dict[str, Any]:
     """获取币安期货账户的余额信息和当前未平仓的头寸。"""
@@ -127,7 +127,9 @@ class SignalGenerator:
             if not ohlcv: return pd.DataFrame()
 
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            # 关键修改：将UTC时间戳转换为北京时间
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('Asia/Shanghai')
+            
             numeric_cols = ['open', 'high', 'low', 'close', 'volume']
             for col in numeric_cols: df[col] = pd.to_numeric(df[col], errors='coerce')
             df.dropna(subset=numeric_cols, inplace=True)
