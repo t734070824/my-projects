@@ -14,23 +14,60 @@ logging.basicConfig(
     encoding='utf-8'
 )
 
+def get_account_status(exchange: ccxt.Exchange) -> Dict[str, Any]:
+    """获取币安期货账户的余额信息和当前未平仓的头寸。"""
+    logger = logging.getLogger("AccountStatus")
+    logger.debug("开始获取账户状态...")
+    try:
+        # 1. 获取账户余额
+        balance_data = exchange.fetch_balance()
+        usdt_balance = next((item for item in balance_data['info']['assets'] if item['asset'] == 'USDT'), {})
+        
+        # 2. 获取未平仓头寸
+        positions_data = exchange.fetch_positions()
+        open_positions = [p for p in positions_data if float(p['info']['positionAmt']) != 0]
+        
+        logger.debug(f"发现 {len(open_positions)} 个未平仓头寸。")
+
+        # 3. 整理并返回数据
+        return {
+            "usdt_balance": {
+                'walletBalance': usdt_balance.get('walletBalance'),
+                'availableBalance': usdt_balance.get('availableBalance'),
+                'unrealizedProfit': usdt_balance.get('unrealizedProfit')
+            },
+            "open_positions": [
+                {
+                    'symbol': p['symbol'],
+                    'side': 'long' if float(p['info']['positionAmt']) > 0 else 'short',
+                    'size': float(p['info']['positionAmt']),
+                    'entryPrice': float(p['entryPrice']),
+                    'markPrice': float(p['markPrice']),
+                    'unrealizedPnl': float(p['unrealizedPnl']),
+                    'leverage': int(p['leverage']),
+                } for p in open_positions
+            ]
+        }
+    except ccxt.AuthenticationError as e:
+        logger.error(f"API密钥认证失败: {e}")
+        return {"error": "AuthenticationError"}
+    except ccxt.NetworkError as e:
+        logger.error(f"网络连接失败: {e}")
+        return {"error": "NetworkError"}
+    except Exception as e:
+        logger.error(f"获取账户信息时发生未知错误: {e}", exc_info=True)
+        return {"error": str(e)}
+
 class SignalGenerator:
     """
     一个多维度、基于评分的交易信号生成器。
-    集成了用户高级策略：处理指标冲突、增加量能验证、引入KDJ/MACD/BOLL协同过滤。
     """
 
-    def __init__(self, symbol: str, timeframe: str = '4h', proxy: Optional[str] = None):
+    def __init__(self, symbol: str, timeframe: str, exchange: ccxt.Exchange):
         self.symbol = symbol
         self.timeframe = timeframe
         self.logger = logging.getLogger(f"SignalGenerator.{symbol}.{timeframe}")
-        
-        exchange_config = {'options': {'defaultType': 'future'}}
-        if proxy:
-            self.logger.info(f"使用代理: {proxy}")
-            exchange_config['proxies'] = {'http': proxy, 'https': proxy}
-
-        self.exchange = ccxt.binance(exchange_config)
+        self.exchange = exchange
         self.history_limit = config.HISTORY_LIMIT
         self.required_columns = [
             'SMA_20', 'SMA_50', 'SMA_200', 'VOL_SMA_20',
@@ -60,7 +97,6 @@ class SignalGenerator:
     def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         self.logger.debug("开始计算技术指标...")
         try:
-            # 将所有指标计算合并回一个ta.strategy调用，保持代码整洁
             df.ta.strategy(ta.Strategy(
                 name="Comprehensive_Strategy",
                 ta=[
@@ -146,7 +182,7 @@ class SignalGenerator:
             "scores_breakdown": scores, "reasons": reasons
         }
 
-    def generate_signal(self) -> Dict[str, Any]:
+    def generate_signal(self, account_status: Optional[Dict] = None) -> Dict[str, Any]:
         self.logger.info("开始生成信号...")
         df = self._fetch_data()
         if df.empty: self.logger.warning("数据为空，中止。 "); return {"error": "无法获取K线数据"}
@@ -163,6 +199,8 @@ class SignalGenerator:
         
         if final_signal:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
+            if account_status:
+                final_signal['account_status'] = account_status
         else:
             self.logger.warning("信号生成失败，已中止。")
         return final_signal
