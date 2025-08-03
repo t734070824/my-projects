@@ -36,7 +36,7 @@ class SignalGenerator:
             'MACD_12_26_9', 'MACDs_12_26_9', 'MACDh_12_26_9',
             'RSI_14', 'BBU_20_2.0', 'BBL_20_2.0',
             'ADX_14', 'ISA_9', 'ISB_26',
-            'K_9_3_3', 'D_9_3_3', 'J_9_3_3'
+            'K_9_3', 'D_9_3', 'J_9_3'
         ]
 
     def _fetch_data(self) -> pd.DataFrame:
@@ -59,28 +59,19 @@ class SignalGenerator:
     def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         self.logger.debug("开始计算技术指标...")
         try:
-            # 第一步：计算除KDJ外的所有指标
+            # 将所有指标计算合并回一个ta.strategy调用，保持代码整洁
             df.ta.strategy(ta.Strategy(
                 name="Comprehensive_Strategy",
                 ta=[
                     {"kind": "sma", "length": 20}, {"kind": "sma", "length": 50}, {"kind": "sma", "length": 200},
                     {"kind": "macd"}, {"kind": "rsi"}, {"kind": "bbands", "length": 20},
-                    {"kind": "adx"}, {"kind": "ichimoku"},
+                    {"kind": "adx"}, {"kind": "ichimoku"}, {"kind": "kdj"},
                     {"kind": "sma", "close": "volume", "length": 20, "prefix": "VOL"}
                 ]
             ))
         except Exception as e:
-            self.logger.error(f"基础指标计算发生异常: {e}", exc_info=True)
+            self.logger.error(f"技术指标计算过程中发生异常: {e}", exc_info=True)
         
-        # --- 最终修复：独立计算KDJ并手动合并，以应对静默失败问题 ---
-        try:
-            self.logger.debug("正在独立计算并合并KDJ指标...")
-            kdj = df.ta.kdj(append=False)
-            df = pd.concat([df, kdj], axis=1)
-            self.logger.debug("KDJ指标计算并合并成功。")
-        except Exception as e:
-            self.logger.error(f"KDJ指标计算或合并过程中发生错误: {e}", exc_info=True)
-
         self.logger.debug("技术指标计算完成。")
         return df
 
@@ -117,7 +108,7 @@ class SignalGenerator:
             scores['trend'] += score; reasons.append(f"[趋势: 看空] 价格在云层之下 (云厚: {cloud_thickness:.2%}, 得分: {score})")
 
         is_rsi_oversold = latest['RSI_14'] < 30
-        is_kdj_oversold = latest['K_9_3_3'] < 20
+        is_kdj_oversold = latest['K_9_3'] < 20
         is_adx_strong = latest['ADX_14'] > 25
 
         if is_rsi_oversold and not is_adx_strong:
@@ -149,8 +140,6 @@ class SignalGenerator:
         elif total_score <= -4: signal = "STRONG_SELL"
         elif total_score < 0: signal = "WEAK_SELL"
 
-        score_details = f"趋势={scores['trend']} | 动量={scores['momentum']} | 波动率={scores['volatility']} | 成交量={scores['volume']} | 情绪={scores['sentiment']}"
-        self.logger.info(f"分数计算详情: {score_details} -> 总分: {total_score}")
         return {
             "timestamp": latest['timestamp'], "total_score": total_score, "signal": signal,
             "scores_breakdown": scores, "reasons": reasons
@@ -171,6 +160,8 @@ class SignalGenerator:
         df_with_indicators = self._calculate_indicators(df)
         final_signal = self._apply_scoring_logic(df_with_indicators, funding_rate_data)
         
-        if final_signal: self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}")
-        else: self.logger.warning("信号生成失败，已中止。")
+        if final_signal:
+            self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
+        else:
+            self.logger.warning("信号生成失败，已中止。")
         return final_signal

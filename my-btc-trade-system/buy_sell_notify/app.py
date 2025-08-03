@@ -4,61 +4,67 @@ import time
 import logging
 import json
 
-# 由于app.py和signal_generator.py在同一个文件夹下，可以直接导入
 from signal_generator import SignalGenerator
 
 # --- 核心分析函数 ---
 def run_multi_symbol_analysis():
-    """遍历多个交易对，执行多时间周期信号分析。"""
-    # --- 配置区 ---
-    # 如果需要代理，请在此处填入您的代理服务器地址
-    PROXY = 'http://127.0.0.1:10809'  # 不需要代理则设置为 None
-    
-    # 要分析的交易对列表
+    """遍历多个交易对，执行三重时间周期信号分析 (1d, 4h, 1h)。"""
+    PROXY = 'http://127.0.0.1:10809'
     SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
-    # ---
 
     for symbol in SYMBOLS_TO_ANALYZE:
         logging.info(f"================== 开始分析: {symbol} ==================")
         
-        # 1. 战略层面：日线图
+        # 1. 战略层面：日线图 (1d)
         logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")
         daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', proxy=PROXY)
         daily_analysis = daily_signal_gen.generate_signal()
-        
-        if daily_analysis and 'error' not in daily_analysis:
-            daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
-            logging.info(f"[{symbol}] 日线分析结果: {daily_analysis_str}")
-            
-            is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
-            long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
-            logging.info(f"[{symbol}] 长期趋势判断: {long_term_direction}")
+        if not (daily_analysis and 'error' not in daily_analysis):
+            logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。")
+            continue
 
-            # 2. 战术层面：4小时图
-            logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
-            h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=PROXY)
-            h4_analysis = h4_signal_gen.generate_signal()
-            
-            if h4_analysis and 'error' not in h4_analysis:
-                h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
-                logging.info(f"[{symbol}] 4小时线分析结果: {h4_analysis_str}")
-                trade_signal = h4_analysis.get('signal', 'NEUTRAL')
+        daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
+        logging.info(f"[{symbol}] 日线分析结果: \n{daily_analysis_str}")
+        is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
+        long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
+        logging.info(f"[{symbol}] 长期趋势判断: {long_term_direction}")
 
-                # 3. 最终决策
-                logging.info(f"--- 3. [{symbol}] 最终决策 ---")
-                final_decision = "HOLD"
-                if is_long_term_bullish and trade_signal in ['STRONG_BUY', 'WEAK_BUY']:
-                    final_decision = "EXECUTE_LONG"
-                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看多，且短期出现买入信号。 সন")
-                elif not is_long_term_bullish and trade_signal in ['STRONG_SELL', 'WEAK_SELL']:
-                    final_decision = "EXECUTE_SHORT"
-                    logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 长期趋势看空/震荡，且短期出现卖出信号。 সন")
-                else:
-                    logging.info(f"决策: {final_decision} - 原因: [{symbol}] 长短期方向冲突或信号不明 ({long_term_direction} vs {trade_signal})。建议观望。 সন")
-            else:
-                logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。 সন")
+        # 2. 战术层面：4小时图 (4h)
+        logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
+        h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=PROXY)
+        h4_analysis = h4_signal_gen.generate_signal()
+        if not (h4_analysis and 'error' not in h4_analysis):
+            logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。")
+            continue
+
+        h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
+        logging.info(f"[{symbol}] 4小时线分析结果: \n{h4_analysis_str}")
+        is_mid_term_bullish = h4_analysis.get('total_score', 0) > 0
+
+        # 3. 执行层面：1小时图 (1h)
+        logging.info(f"--- 3. [{symbol}] 分析执行层面 (1小时图) ---")
+        h1_signal_gen = SignalGenerator(symbol=symbol, timeframe='1h', proxy=PROXY)
+        h1_analysis = h1_signal_gen.generate_signal()
+        if not (h1_analysis and 'error' not in h1_analysis):
+            logging.error(f"无法完成 [{symbol}] 的执行层面分析，已跳过。")
+            continue
+
+        h1_analysis_str = json.dumps(h1_analysis, indent=4, default=str, ensure_ascii=False)
+        logging.info(f"[{symbol}] 1小时线分析结果: \n{h1_analysis_str}")
+        h1_signal = h1_analysis.get('signal', 'NEUTRAL')
+
+        # 4. 最终决策：三重时间周期过滤
+        logging.info(f"--- 4. [{symbol}] 最终决策 (三重过滤) ---")
+        final_decision = "HOLD"
+        if is_long_term_bullish and is_mid_term_bullish and h1_signal in ['STRONG_BUY', 'WEAK_BUY']:
+            final_decision = "EXECUTE_LONG"
+            logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看多，且1h出现买入信号。")
+        elif not is_long_term_bullish and not is_mid_term_bullish and h1_signal in ['STRONG_SELL', 'WEAK_SELL']:
+            final_decision = "EXECUTE_SHORT"
+            logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看空，且1h出现卖出信号。")
         else:
-            logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。 সন")
+            reason = f"1d({long_term_direction}) | 4h({'看多' if is_mid_term_bullish else '看空'}) | 1h({h1_signal})"
+            logging.info(f"决策: {final_decision} - 原因: [{symbol}] 时间周期信号冲突 ({reason})。建议观望。")
             
         logging.info(f"================== 完成分析: {symbol} ==================\n")
 
@@ -66,15 +72,13 @@ def run_multi_symbol_analysis():
 def main():
     """主函数 - 设置定时任务"""
     logging.info("=== 新版交易信号分析系统启动 ===")
-    logging.info("系统将每小时执行一次分析...")
+    logging.info("系统将每小时的01分执行一次分析...")
     
-    # 立即执行一次
     run_multi_symbol_analysis()
     
-    # 设置定时任务：每小时执行一次分析
-    schedule.every().hour.do(run_multi_symbol_analysis)
+    # --- 关键修改：设置为每小时的第01分钟执行 ---
+    schedule.every().hour.at(":01").do(run_multi_symbol_analysis)
     
-    # 保持程序运行
     while True:
         try:
             schedule.run_pending()
@@ -84,7 +88,7 @@ def main():
             break
         except Exception as e:
             logging.error(f"定时任务执行出错: {e}", exc_info=True)
-            time.sleep(60)  # 出错后等待1分钟再继续
+            time.sleep(60)
 
 if __name__ == "__main__":
     main()
