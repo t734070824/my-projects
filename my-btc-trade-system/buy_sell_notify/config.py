@@ -1,5 +1,10 @@
 # buy_sell_notify/config.py
 
+# --- DingTalk Notifier Settings ---
+# IMPORTANT: Replace with your actual DingTalk Bot Webhook URL and Secret Key
+DINGTALK_WEBHOOK = "YOUR_WEBHOOK_URL"
+DINGTALK_SECRET = "YOUR_SECRET" # This is the secret key, not the access token
+
 # --- Binance API Keys ---
 # IMPORTANT: Replace with your actual API Key and Secret Key
 # Note: This is for the Futures account.

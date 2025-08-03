@@ -5,6 +5,7 @@ import math
 
 import config
 from signal_generator import get_account_status, get_atr_info
+from dingtalk_notifier import send_dingtalk_markdown
 
 def find_associated_stop_loss_order(open_orders, position):
     """
@@ -15,18 +16,18 @@ def find_associated_stop_loss_order(open_orders, position):
     position_side = position['side']
     position_size = abs(float(position['size']))
     
-    # 确定止损单应该的方向 (与持仓相反)
     sl_side = 'sell' if position_side == 'long' else 'buy'
 
     for order in open_orders:
-        # 筛选条件：交易对相同，方向匹配，是止损单类型
         if (
             order['symbol'] == position_symbol and
             order['side'] == sl_side and
-            order['type'] in ['stop', 'stop_market']
+            order['type'] in ['stop', 'stop_market'] and
+            order.get('amount') is not None and
+            math.isclose(float(order['amount']), position_size)
         ):
-            return order # 找到匹配的止损单
-    return None # 未找到
+            return order
+    return None
 
 def monitor_existing_positions(exchange: ccxt.Exchange):
     """
@@ -37,7 +38,6 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 
     while True:
         try:
-            # 1. 获取当前真实的未平仓头寸
             account_status = get_account_status(exchange)
             if 'error' in account_status:
                 logger.error(f"无法获取账户状态: {account_status['error']}"); time.sleep(60); continue
@@ -48,16 +48,12 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 
             logger.info(f"监控 {len(open_positions)} 个真实仓位...")
 
-            # 2. 遍历所有真实持仓
             for position in open_positions:
                 symbol = position['symbol']
                 side = position['side']
                 entry_price = float(position['entryPrice'])
 
-                # 关键修复：只获取当前交易对的订单，避免频率超限
                 open_orders_for_symbol = exchange.fetch_open_orders(symbol)
-
-                # 核心改进：查找与该持仓关联的真实止损单
                 stop_loss_order = find_associated_stop_loss_order(open_orders_for_symbol, position)
 
                 if not stop_loss_order:
@@ -65,37 +61,29 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
                     continue
                 
                 current_stop_price = float(stop_loss_order['stopPrice'])
-
-                # a. 获取最新价格
                 ticker = exchange.fetch_ticker(symbol)
                 current_price = ticker['last']
-
-                # b. 获取最新的ATR信息
                 atr_info = get_atr_info(symbol, exchange)
                 if 'error' in atr_info or not atr_info.get('atr'):
                     logger.warning(f"无法为 [{symbol}] 获取ATR，跳过追踪止损检查。")
                     continue
 
-                # c. 计算新的理想止损位
                 trade_config = config.VIRTUAL_TRADE_CONFIG
                 stop_loss_distance = atr_info['atr'] * trade_config["ATR_MULTIPLIER_FOR_SL"]
                 
                 new_suggested_sl = None
                 if side == 'long' and current_price > entry_price + stop_loss_distance:
                     potential_new_sl = current_price - stop_loss_distance
-                    # 关键决策：只有当新建议的止损位优于当前已设置的止损位时，才发出建议
                     if potential_new_sl > current_stop_price:
                         new_suggested_sl = potential_new_sl
                 
                 elif side == 'short' and current_price < entry_price - stop_loss_distance:
                     potential_new_sl = current_price + stop_loss_distance
-                    # 关键决策：只有当新建议的止损位优于当前已设置的止损位时，才发出建议
                     if potential_new_sl < current_stop_price:
                         new_suggested_sl = potential_new_sl
 
-                # d. 发出更新建议
                 if new_suggested_sl:
-                    logger.warning(f"""
+                    log_message = f"""
     ------------------------------------------------------------
     |             >>> TRAILING STOP-LOSS UPDATE <<<              |
     ------------------------------------------------------------
@@ -107,7 +95,21 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
     | SUGGESTED New SL: {new_suggested_sl:,.4f} (to lock profit)
     | ACTION:           Cancel old order and create a new one.
     ------------------------------------------------------------
-    """)
+    """
+                    logger.warning(log_message)
+
+                    # --- 新增：发送钉钉通知 ---
+                    title = f"止损更新建议: {symbol}"
+                    markdown_text = f"""### **止损更新建议: {symbol}**
+
+- **持仓方向**: {side.upper()}
+- **开仓价格**: {entry_price:,.4f}
+- **当前价格**: {current_price:,.4f}
+- **当前止损**: {current_stop_price:,.4f}
+- **<font color='#FF0000'>建议新止损</font>**: **{new_suggested_sl:,.4f}**
+- **操作建议**: 取消旧订单({stop_loss_order['id']})，创建新止损单。
+"""
+                    send_dingtalk_markdown(title, markdown_text)
                 else:
                     logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。")
 
@@ -116,12 +118,10 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
         except Exception as e:
             logger.error(f"监控循环发生未知错误: {e}", exc_info=True)
         
-        # 等待指定间隔后再次检查
         time.sleep(config.MONITOR_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
-    # --- 1. 配置日志 ---
     log_formatter = logging.Formatter(
         fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -135,7 +135,6 @@ if __name__ == "__main__":
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.INFO)
 
-    # --- 2. 初始化交易所实例 ---
     logger = logging.getLogger("MainMonitor")
     logger.info("初始化交易所实例...")
     exchange_config = {
@@ -149,11 +148,9 @@ if __name__ == "__main__":
     
     exchange = ccxt.binance(exchange_config)
 
-    # --- 3. 添加监控频率配置 (需要在 config.py 中定义) ---
     if not hasattr(config, 'MONITOR_INTERVAL_SECONDS'):
         logger.error("请在 config.py 文件中添加 'MONITOR_INTERVAL_SECONDS' 配置项 (例如: 15)")
     else:
-        # --- 4. 启动监控 ---
         try:
             monitor_existing_positions(exchange)
         except KeyboardInterrupt:
