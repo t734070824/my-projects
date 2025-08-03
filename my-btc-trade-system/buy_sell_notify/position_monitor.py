@@ -108,7 +108,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
     | SUGGESTED New SL: {new_suggested_sl:,.4f} (to lock profit)
     | ACTION:           Cancel old order and create a new one.
     ------------------------------------------------------------
-    ")
+    """)
                 else:
                     logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。" )
 
