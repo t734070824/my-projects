@@ -35,12 +35,12 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
     if existing_position:
         # --- 逻辑2：已有持仓，检查是否需要追踪止损 ---
         entry_price = float(existing_position['entryPrice'])
+        position_side = existing_position['side']
+        logger.info(f"发现已持有 [{symbol}] 的 {position_side.upper()} 仓位，将检查追踪止损条件。")
         
-        if existing_position['side'] == 'long':
-            # 对于多头，只有当价格上涨超过一个止损距离时，才开始追踪
+        if position_side == 'long':
             if current_price > entry_price + stop_loss_distance:
                 new_stop_loss = current_price - stop_loss_distance
-                # 确保新的止损点高于入场价，以锁定利润
                 if new_stop_loss > entry_price:
                     logger.warning(f"""
     ------------------------------------------------------------
@@ -52,11 +52,9 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
     | New Stop Loss:    {new_stop_loss:,.4f} (Profit Locked)
     ------------------------------------------------------------
     """)
-        elif existing_position['side'] == 'short':
-            # 对于空头，只有当价格下跌超过一个止损距离时，才开始追踪
+        elif position_side == 'short':
             if current_price < entry_price - stop_loss_distance:
                 new_stop_loss = current_price + stop_loss_distance
-                # 确保新的止损点低于入场价，以锁定利润
                 if new_stop_loss < entry_price:
                     logger.warning(f"""
     ------------------------------------------------------------
@@ -73,6 +71,11 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         # --- 逻辑1：没有持仓，检查是否有新的开仓信号 ---
         if final_decision not in ["EXECUTE_LONG", "EXECUTE_SHORT"]:
             return # 没有开仓信号，且没有持仓，不做任何事
+
+        # 关键逻辑：在准备开新仓前，再次确认没有持仓（以防万一）
+        if existing_position:
+            logger.warning(f"信号冲突：收到 {final_decision} 信号，但已持有 [{symbol}] 仓位。本次不执行任何操作。")
+            return
 
         available_balance = float(available_balance_str)
         risk_per_trade = trade_config["RISK_PER_TRADE_PERCENT"] / 100
