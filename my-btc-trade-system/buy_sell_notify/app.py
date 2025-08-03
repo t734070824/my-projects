@@ -33,9 +33,32 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
     stop_loss_distance = atr * atr_multiplier
 
     if existing_position:
-        # --- 逻辑2：已有持仓，检查是否需要追踪止损 ---
-        entry_price = float(existing_position['entryPrice'])
+        # --- 逻辑2：已有持仓，检查信号冲突或追踪止损 ---
         position_side = existing_position['side']
+        
+        # 关键修正：检查新信号是否与持仓方向相反
+        is_reversal_signal = (
+            (position_side == 'long' and final_decision == "EXECUTE_SHORT") or
+            (position_side == 'short' and final_decision == "EXECUTE_LONG")
+        )
+
+        if is_reversal_signal:
+            logger.warning(f"""
+    ------------------------------------------------------------
+    |                  REVERSAL SIGNAL ALERT                   |
+    ------------------------------------------------------------
+    | Symbol:           {symbol}
+    | Current Position: {position_side.upper()}
+    | New Signal:       {final_decision}
+    |
+    | ACTION:           Consider closing the current position and
+    |                   evaluating the new signal for entry.
+    ------------------------------------------------------------
+    """)
+            return # 发现反转信号，停止后续操作
+
+        # 如果不是反转信号，则执行原有的追踪止损逻辑
+        entry_price = float(existing_position['entryPrice'])
         logger.info(f"发现已持有 [{symbol}] 的 {position_side.upper()} 仓位，将检查追踪止损条件。")
         
         if position_side == 'long':
