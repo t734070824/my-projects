@@ -4,6 +4,7 @@ import pandas_ta as ta
 from typing import Dict, Any, List, Optional
 import logging
 import json
+import config
 
 # 配置基础日志
 logging.basicConfig(
@@ -30,7 +31,7 @@ class SignalGenerator:
             exchange_config['proxies'] = {'http': proxy, 'https': proxy}
 
         self.exchange = ccxt.binance(exchange_config)
-        self.history_limit = 400
+        self.history_limit = config.HISTORY_LIMIT
         self.required_columns = [
             'SMA_20', 'SMA_50', 'SMA_200', 'VOL_SMA_20',
             'MACD_12_26_9', 'MACDs_12_26_9', 'MACDh_12_26_9',

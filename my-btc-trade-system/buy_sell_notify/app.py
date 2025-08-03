@@ -4,20 +4,18 @@ import time
 import logging
 import json
 
+import config
 from signal_generator import SignalGenerator
 
 # --- 核心分析函数 ---
 def run_multi_symbol_analysis():
     """遍历多个交易对，执行三重时间周期信号分析 (1d, 4h, 1h)。"""
-    PROXY = 'http://127.0.0.1:10809'
-    SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
-
-    for symbol in SYMBOLS_TO_ANALYZE:
+    for symbol in config.SYMBOLS_TO_ANALYZE:
         logging.info(f"================== 开始分析: {symbol} ==================")
         
         # 1. 战略层面：日线图 (1d)
         logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")
-        daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', proxy=PROXY)
+        daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', proxy=config.PROXY)
         daily_analysis = daily_signal_gen.generate_signal()
         if not (daily_analysis and 'error' not in daily_analysis):
             logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。")
@@ -31,7 +29,7 @@ def run_multi_symbol_analysis():
 
         # 2. 战术层面：4小时图 (4h)
         logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
-        h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=PROXY)
+        h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', proxy=config.PROXY)
         h4_analysis = h4_signal_gen.generate_signal()
         if not (h4_analysis and 'error' not in h4_analysis):
             logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。")
@@ -43,7 +41,7 @@ def run_multi_symbol_analysis():
 
         # 3. 执行层面：1小时图 (1h)
         logging.info(f"--- 3. [{symbol}] 分析执行层面 (1小时图) ---")
-        h1_signal_gen = SignalGenerator(symbol=symbol, timeframe='1h', proxy=PROXY)
+        h1_signal_gen = SignalGenerator(symbol=symbol, timeframe='1h', proxy=config.PROXY)
         h1_analysis = h1_signal_gen.generate_signal()
         if not (h1_analysis and 'error' not in h1_analysis):
             logging.error(f"无法完成 [{symbol}] 的执行层面分析，已跳过。")
@@ -72,12 +70,12 @@ def run_multi_symbol_analysis():
 def main():
     """主函数 - 设置定时任务"""
     logging.info("=== 新版交易信号分析系统启动 ===")
-    logging.info("系统将每小时的01分执行一次分析...")
+    logging.info(f"系统将每小时的{config.RUN_AT_MINUTE}分执行一次分析...")
     
     run_multi_symbol_analysis()
     
     # --- 关键修改：设置为每小时的第01分钟执行 ---
-    schedule.every().hour.at(":01").do(run_multi_symbol_analysis)
+    schedule.every().hour.at(config.RUN_AT_MINUTE).do(run_multi_symbol_analysis)
     
     while True:
         try:
