@@ -29,7 +29,7 @@ HISTORY_LIMIT = 400
 # A "DEFAULT" key is required as a fallback for symbols not explicitly listed.
 ATR_CONFIG = {
     "DEFAULT": {"timeframe": "1d", "length": 14},
-    "BTC/USDT": {"timeframe": "4h", "length": 14},
+    "BTC/USDT": {"timeframe": "1d", "length": 14},
     "ETH/USDT": {"timeframe": "4h", "length": 20},
     # You can add other symbols here, e.g.:
         "SOL/USDT": {"timeframe": "4h", "length": 20},
@@ -38,7 +38,7 @@ ATR_CONFIG = {
 # --- Virtual Trading Settings ---
 # Settings for calculating virtual trade parameters.
 VIRTUAL_TRADE_CONFIG = {
-    "RISK_PER_TRADE_PERCENT": 1.0,  # Risk 1% of the available balance per trade
+    "RISK_PER_TRADE_PERCENT": 2.0,  # Risk 1% of the available balance per trade
     "ATR_MULTIPLIER_FOR_SL": 2.0   # Stop loss will be set at 2 * ATR from the entry price
 }
 
