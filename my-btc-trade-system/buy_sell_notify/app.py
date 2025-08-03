@@ -6,7 +6,7 @@ import json
 import ccxt
 
 import config
-from signal_generator import SignalGenerator, get_account_status
+from signal_generator import SignalGenerator, get_account_status, get_atr_info
 
 # --- 核心分析函数 ---
 def run_multi_symbol_analysis():
@@ -35,16 +35,22 @@ def run_multi_symbol_analysis():
     for symbol in config.SYMBOLS_TO_ANALYZE:
         logging.info(f"================== 开始分析: {symbol} ==================")
         
+        # 为当前交易对获取ATR信息
+        logging.info(f"--- 0. [{symbol}] 获取ATR信息 (周期: {config.ATR_TIMEFRAME}, 长度: {config.ATR_LENGTH}) ---")
+        atr_info = get_atr_info(symbol, exchange)
+        if 'error' in atr_info:
+            logging.warning(f"无法获取 [{symbol}] 的ATR信息: {atr_info['error']}，将继续分析。")
+
         # 1. 战略层面：日线图 (1d)
         logging.info(f"--- 1. [{symbol}] 分析战略层面 (日线图) ---")
         daily_signal_gen = SignalGenerator(symbol=symbol, timeframe='1d', exchange=exchange)
-        daily_analysis = daily_signal_gen.generate_signal(account_status)
+        daily_analysis = daily_signal_gen.generate_signal(account_status, atr_info)
         if not (daily_analysis and 'error' not in daily_analysis):
             logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。")
             continue
 
         daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
-        logging.info(f"[{symbol}] 日线分析结果: \n{daily_analysis_str}")
+        logging.info(f"[{symbol}] 日线分析结果: {daily_analysis_str}")
         is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
         long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
         logging.info(f"[{symbol}] 长期趋势判断: {long_term_direction}")
@@ -52,22 +58,23 @@ def run_multi_symbol_analysis():
         # 2. 战术层面：4小时图 (4h)
         logging.info(f"--- 2. [{symbol}] 分析战术层面 (4小时图) ---")
         h4_signal_gen = SignalGenerator(symbol=symbol, timeframe='4h', exchange=exchange)
-        h4_analysis = h4_signal_gen.generate_signal(account_status)
+        h4_analysis = h4_signal_gen.generate_signal(account_status, atr_info)
         if not (h4_analysis and 'error' not in h4_analysis):
             logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。")
             continue
 
         h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
-        logging.info(f"[{symbol}] 4小时线分析结果: \n{h4_analysis_str}")
+        logging.info(f"[{symbol}] 4小时线分析结果: {h4_analysis_str}")
         is_mid_term_bullish = h4_analysis.get('total_score', 0) > 0
 
         # 3. 执行层面：1小时图 (1h)
         logging.info(f"--- 3. [{symbol}] 分析执行层面 (1小时图) ---")
         h1_signal_gen = SignalGenerator(symbol=symbol, timeframe='1h', exchange=exchange)
-        h1_analysis = h1_signal_gen.generate_signal(account_status)
+        h1_analysis = h1_signal_gen.generate_signal(account_status, atr_info)
         if not (h1_analysis and 'error' not in h1_analysis):
             logging.error(f"无法完成 [{symbol}] 的执行层面分析，已跳过。")
             continue
+
 
         h1_analysis_str = json.dumps(h1_analysis, indent=4, default=str, ensure_ascii=False)
         logging.info(f"[{symbol}] 1小时线分析结果: \n{h1_analysis_str}")

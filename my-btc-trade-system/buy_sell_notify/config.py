@@ -22,3 +22,8 @@ RUN_AT_MINUTE = ":01"
 # --- Data Fetching Settings ---
 # Number of historical candles to fetch for analysis
 HISTORY_LIMIT = 400
+
+# --- Indicator Settings ---
+# Timeframe and length for ATR calculation
+ATR_TIMEFRAME = '1d'
+ATR_LENGTH = 14

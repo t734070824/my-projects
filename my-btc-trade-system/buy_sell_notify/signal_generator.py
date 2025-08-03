@@ -58,6 +58,44 @@ def get_account_status(exchange: ccxt.Exchange) -> Dict[str, Any]:
         logger.error(f"获取账户信息时发生未知错误: {e}", exc_info=True)
         return {"error": str(e)}
 
+def get_atr_info(symbol: str, exchange: ccxt.Exchange) -> Dict[str, Any]:
+    """获取指定交易对的ATR（平均真实波幅）值。"""
+    logger = logging.getLogger("ATR_Fetcher")
+    logger.debug(f"开始获取 {symbol} 的ATR信息...")
+    try:
+        # 1. 从配置读取参数
+        timeframe = config.ATR_TIMEFRAME
+        length = config.ATR_LENGTH
+        
+        # 2. 获取K线数据 (需要比ATR长度更多的数据来确保计算准确)
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=length + 10)
+        if not ohlcv:
+            logger.warning(f"无法获取 {symbol} 在 {timeframe} 的K线数据。")
+            return {"error": "No OHLCV data"}
+
+        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        for col in ['open', 'high', 'low', 'close']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # 3. 计算ATR
+        df.ta.atr(length=length, append=True)
+        
+        # 4. 检查结果并返回
+        atr_col_name = f'ATRr_{length}'
+        if atr_col_name not in df.columns or df[atr_col_name].isnull().all():
+            logger.error(f"无法计算 {symbol} 的ATR值。")
+            return {"error": "ATR calculation failed"}
+            
+        # 返回倒数第二个值，因为它对应的是最新一根完整K线的ATR
+        latest_atr = df[atr_col_name].iloc[-2]
+        
+        logger.debug(f"成功获取 {symbol} 的ATR值为: {latest_atr}")
+        return {"atr": round(latest_atr, 4)}
+
+    except Exception as e:
+        logger.error(f"获取 {symbol} 的ATR信息时发生错误: {e}", exc_info=True)
+        return {"error": str(e)}
+
 class SignalGenerator:
     """
     一个多维度、基于评分的交易信号生成器。
@@ -182,7 +220,7 @@ class SignalGenerator:
             "scores_breakdown": scores, "reasons": reasons
         }
 
-    def generate_signal(self, account_status: Optional[Dict] = None) -> Dict[str, Any]:
+    def generate_signal(self, account_status: Optional[Dict] = None, atr_info: Optional[Dict] = None) -> Dict[str, Any]:
         self.logger.info("开始生成信号...")
         df = self._fetch_data()
         if df.empty: self.logger.warning("数据为空，中止。 "); return {"error": "无法获取K线数据"}
@@ -201,6 +239,8 @@ class SignalGenerator:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
             if account_status:
                 final_signal['account_status'] = account_status
+            if atr_info:
+                final_signal['atr_info'] = atr_info
         else:
             self.logger.warning("信号生成失败，已中止。")
         return final_signal
