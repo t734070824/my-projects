@@ -19,6 +19,10 @@ SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
 # Time to run the analysis every hour. Use ":01" for the 1st minute of the hour.
 RUN_AT_MINUTE = ":01"
 
+# --- Monitoring Settings ---
+# Interval in seconds for the independent position monitor to check for updates.
+MONITOR_INTERVAL_SECONDS = 15
+
 # --- Data Fetching Settings ---
 # Number of historical candles to fetch for analysis
 HISTORY_LIMIT = 400

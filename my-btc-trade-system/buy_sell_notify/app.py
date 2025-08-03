@@ -1,9 +1,10 @@
-
 import schedule
 import time
 import logging
 import json
 import ccxt
+import subprocess
+import sys
 
 import config
 from signal_generator import SignalGenerator, get_account_status, get_atr_info
@@ -25,7 +26,7 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         logger.error(f"无法管理 {symbol} 的虚拟交易：缺少价格、ATR或余额信息。")
         return
 
-    # --- 检查是否存在当前交易对的持仓 (关键修复：处理':USDT'后缀) ---
+    # --- 检查是否存在当前交易对的持仓 (关键修复：处理':USDT' 后缀) ---
     existing_position = next((p for p in open_positions if p['symbol'].split(':')[0] == symbol), None)
     
     trade_config = config.VIRTUAL_TRADE_CONFIG
@@ -228,7 +229,7 @@ def run_multi_symbol_analysis():
 
 # --- 主程序入口 ---
 def main():
-    """主函数 - 设置定时任务"""
+    """主函数 - 设置定时任务并启动独立监控进程"""
     # --- 配置日志以使用本地时间 ---
     log_formatter = logging.Formatter(
         fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -245,24 +246,35 @@ def main():
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.INFO)
 
-    logging.info("=== 新版交易信号分析系统启动 (使用本地时间) ===")
-    logging.info(f"系统将每小时的{config.RUN_AT_MINUTE}分执行一次分析...")
-    
-    run_multi_symbol_analysis()
-    
-    # --- 关键修改：设置为每小时的第01分钟执行 ---
-    schedule.every().hour.at(config.RUN_AT_MINUTE).do(run_multi_symbol_analysis)
-    
-    while True:
-        try:
+    logging.info("=== 新版交易信号分析系统启动 (主程序) ===")
+
+    # --- 启动独立的监控脚本作为子进程 ---
+    monitor_process = None
+    try:
+        logging.info("正在启动独立的仓位监控进程...")
+        # 使用 sys.executable 来确保子进程使用与主进程相同的 Python 解释器
+        monitor_process = subprocess.Popen([sys.executable, "position_monitor.py"])
+        logging.info(f"仓位监控进程已启动，PID: {monitor_process.pid}")
+
+        # --- 设置并运行主分析任务的定时调度 ---
+        logging.info(f"主分析任务将每小时的{config.RUN_AT_MINUTE}分执行一次分析...")
+        run_multi_symbol_analysis()
+        schedule.every().hour.at(config.RUN_AT_MINUTE).do(run_multi_symbol_analysis)
+        
+        while True:
             schedule.run_pending()
             time.sleep(1)
-        except KeyboardInterrupt:
-            logging.info("\n\n系统被手动停止运行")
-            break
-        except Exception as e:
-            logging.error(f"定时任务执行出错: {e}", exc_info=True)
-            time.sleep(60)
+
+    except KeyboardInterrupt:
+        logging.info("\n\n主程序被手动停止运行")
+    except Exception as e:
+        logging.error(f"主程序发生严重错误: {e}", exc_info=True)
+    finally:
+        if monitor_process:
+            logging.info("正在终止仓位监控进程...")
+            monitor_process.terminate() # 发送终止信号
+            monitor_process.wait() # 等待进程完全终止
+            logging.info("仓位监控进程已终止。")
 
 
 if __name__ == "__main__":
