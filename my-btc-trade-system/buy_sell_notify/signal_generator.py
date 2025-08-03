@@ -244,8 +244,8 @@ class SignalGenerator:
         
         if final_signal:
             self.logger.info(f"信号生成完毕。最终信号: {final_signal.get('signal')}, 总分: {final_signal.get('total_score')}")
-            # if account_status:
-            #     final_signal['account_status'] = account_status
+            if account_status:
+                final_signal['account_status'] = account_status
             if atr_info:
                 final_signal['atr_info'] = atr_info
         else:
