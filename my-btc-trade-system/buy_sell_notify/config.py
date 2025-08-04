@@ -20,7 +20,7 @@ PROXY = None
 
 # --- Analysis Settings ---
 # List of symbols to analyze
-SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XPR/USDT', 'DOGE/USDT']
+SYMBOLS_TO_ANALYZE = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT']
 
 # --- Scheduler Settings ---
 # Time to run the analysis every hour. Use ":01" for the 1st minute of the hour.
