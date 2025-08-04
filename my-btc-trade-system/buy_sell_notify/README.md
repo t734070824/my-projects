@@ -6,7 +6,52 @@
 
 ---
 
+## 📊 系统架构
+
+下图展示了本系统的核心工作流程：
+
+```mermaid
+graph TD
+    subgraph "用户端"
+        A[定时任务 (每小时)]
+    end
+
+    subgraph "核心应用 (app.py)"
+        B{主分析流程}
+        C[启动仓位监控进程] --> D
+    end
+
+    subgraph "独立进程 (position_monitor.py)"
+        D[高频监控真实仓位]
+    end
+
+    subgraph "信号生成 (signal_generator.py)"
+        E[获取K线数据]
+        F[计算技术指标]
+        G{应用双策略模型}
+    end
+
+    subgraph "外部服务"
+        H[(Binance API)]
+        I[(DingTalk API)]
+    end
+
+    A --> B
+    B --> E
+    D --> H
+    E --> H
+    E --> F
+    F --> G
+    G --> B
+    B -- 分析报告/交易信号 --> I
+    D -- 追踪止损建议 --> I
+```
+
+---
+
 ## 核心功能
+
+
 
 - **双策略分析引擎**:
   - **1. 稳健趋势跟踪策略**: 采用经典的三重时间框架过滤系统（日线、4小时、1小时），结合一个包含多种技术指标（SMA, MACD, RSI, 布林带, 一目均衡表等）的综合评分模型，只在长、中、短周期趋势共振时产生交易信号，以捕捉确定性较高的大趋势。
@@ -44,21 +89,20 @@
 
 ---
 
-## 文件结构
+## 📂 文件结构
 
 ```
 .
-├── app.py                  # 主程序入口，负责任务调度和策略整合
-├── position_monitor.py     # 独立的仓位监控进程，负责追踪止损建议
-├── signal_generator.py     # 核心信号生成器，包含两种策略的实现逻辑
-├── config.py               # 所有用户配置项，如API Key、策略参数等
-├── dingtalk_notifier.py    # 钉钉通知模块
-├── requirements.txt        # Python 依赖库列表
-├── Dockerfile              # 用于构建Docker镜像的配置文件
-├── supervisord.conf        # Docker容器内进程管理的配置文件
-├── update_and_redeploy.sh  # 一键拉取代码、构建和部署的Shell脚本
-└── README.md               # 本说明文件
-```
+├── app.py                  # 🚀 主程序入口
+├── position_monitor.py     # 🛰️ 独立的仓位监控进程
+├── signal_generator.py     # 🧠 核心信号生成器
+├── config.py               # ⚙️ 所有用户配置项
+├── dingtalk_notifier.py    # 🔔 钉钉通知模块
+├── requirements.txt        # 📦 Python 依赖库列表
+├── Dockerfile              # 🐳 Docker 配置文件
+├── supervisord.conf        # 🎛️ 进程管理配置文件
+├── update_and_redeploy.sh  # ⚡ 一键部署脚本
+└── README.md               # 📖 本说明文件
 
 ---
 
