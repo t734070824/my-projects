@@ -4,50 +4,6 @@
 
 本系统对接币安(Binance)期货市场，能够同时运行两种互补的交易策略（稳健趋势跟踪 + 激进反转），对多个交易对进行7x24小时不间断分析，并通过钉钉(DingTalk)机器人发送详细的分析报告和实时的交易机会提醒。
 
----
-
-## 📊 系统架构
-
-下图展示了本系统的核心工作流程：
-
-```mermaid
-graph TD
-    subgraph "用户端"
-        A[定时任务 (每小时)]
-    end
-
-    subgraph "核心应用 (app.py)"
-        B{主分析流程}
-        C[启动仓位监控进程] --> D
-    end
-
-    subgraph "独立进程 (position_monitor.py)"
-        D[高频监控真实仓位]
-    end
-
-    subgraph "信号生成 (signal_generator.py)"
-        E[获取K线数据]
-        F[计算技术指标]
-        G{应用双策略模型}
-    end
-
-    subgraph "外部服务"
-        H[(Binance API)]
-        I[(DingTalk API)]
-    end
-
-    A --> B
-    B --> E
-    D --> H
-    E --> H
-    E --> F
-    F --> G
-    G --> B
-    B -- 分析报告/交易信号 --> I
-    D -- 追踪止损建议 --> I
-```
-
----
 
 ## 核心功能
 
@@ -105,6 +61,8 @@ graph TD
 └── README.md               # 📖 本说明文件
 
 ---
+
+```
 
 ## 安装与配置
 
