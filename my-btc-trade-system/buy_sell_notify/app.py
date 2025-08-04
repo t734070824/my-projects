@@ -172,7 +172,7 @@ def run_multi_symbol_analysis():
 
     # --- 2. 循环分析每个交易对 ---
     for symbol in config.SYMBOLS_TO_ANALYZE:
-        logging.info(f"================== 开始分析: {symbol} ==================")
+        logging.info(f"=== 开始分析: {symbol} ")
         
         # 为当前交易对获取ATR信息
         logging.info(f"--- 0. [{symbol}] 获取ATR信息 ---")
@@ -239,7 +239,7 @@ def run_multi_symbol_analysis():
         # 5. 管理虚拟交易（开仓或追踪止损）
         manage_virtual_trade(symbol, final_decision, h1_analysis)
 
-        logging.info(f"================== 完成分析: {symbol} ==================\n")
+        logging.info(f"==完成分析: {symbol} \n")
 
 # --- 新增：包装器函数，用于捕获日志并发送通知 ---
 def run_analysis_and_notify():
@@ -272,7 +272,7 @@ def run_analysis_and_notify():
 
         # 2. 过滤日志，只保留关键信息
         key_info_phrases = [
-            "================== 开始分析:",
+            "开始分析:",
             "的ATR(周期:",
             "长期趋势判断:",
             "决策: ",
@@ -284,7 +284,7 @@ def run_analysis_and_notify():
             "无法获取账户状态", # 分析中止错误
             "无法完成", # 分析跳过错误
             "执行分析时发生严重错误", # 包装器中的错误
-            "================== 完成分析:"
+            "完成分析:"
         ]
         
         filtered_logs = []

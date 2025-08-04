@@ -165,6 +165,7 @@ class SignalGenerator:
         latest = df.iloc[-2]
         self.logger.debug(f"基于时间戳 {latest['timestamp']} 的K线进行分析。")
 
+        # --- 1. 原有的趋势跟踪评分逻辑 ---
         scores = {'trend': 0, 'momentum': 0, 'sentiment': 0, 'volume': 0, 'volatility': 0}
         reasons = []
 
@@ -222,9 +223,31 @@ class SignalGenerator:
         elif total_score <= -4: signal = "STRONG_SELL"
         elif total_score < 0: signal = "WEAK_SELL"
 
+        # --- 2. 新增：激进的反转策略逻辑 ---
+        reversal_signal = "NONE"
+        rev_config = config.REVERSAL_STRATEGY_CONFIG
+        if rev_config["enabled"] and self.timeframe == rev_config["timeframe"]:
+            self.logger.debug(f"正在执行激进反转策略 (RSI < {rev_config['rsi_oversold']} or > {rev_config['rsi_overbought']})")
+            
+            # 做多条件：RSI严重超卖 + 价格触及或跌破布林下轨
+            if latest['RSI_14'] < rev_config["rsi_oversold"] and latest['close'] <= latest['BBL_20_2.0']:
+                reversal_signal = "EXECUTE_REVERSAL_LONG"
+                reasons.append(f"[反转策略: 做多] RSI ({latest['RSI_14']:.2f}) 严重超卖且价格触及布林下轨。")
+            
+            # 做空条件：RSI严重超买 + 价格触及或突破布林上轨
+            elif latest['RSI_14'] > rev_config["rsi_overbought"] and latest['close'] >= latest['BBU_20_2.0']:
+                reversal_signal = "EXECUTE_REVERSAL_SHORT"
+                reasons.append(f"[反转策略: 做空] RSI ({latest['RSI_14']:.2f}) 严重超买且价格触及布林上轨。")
+
+        # --- 3. 整合结果 ---
         return {
-            "timestamp": latest['timestamp'], "total_score": total_score, "signal": signal,
-            "scores_breakdown": scores, "reasons": reasons, "close_price": latest['close']
+            "timestamp": latest['timestamp'], 
+            "total_score": total_score, 
+            "signal": signal,
+            "reversal_signal": reversal_signal, # 新增字段
+            "scores_breakdown": scores, 
+            "reasons": reasons, 
+            "close_price": latest['close']
         }
 
     def generate_signal(self, account_status: Optional[Dict] = None, atr_info: Optional[Dict] = None) -> Dict[str, Any]:

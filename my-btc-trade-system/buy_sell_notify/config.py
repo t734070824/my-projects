@@ -15,8 +15,8 @@ SECRET_KEY = "Ep9pRR8nahbFsTlCJllE8SD981CWygEcFhJ38kSWzvwKIpAXhYl85m4qC3fxKHkc"
 # --- Proxy Settings ---
 # If you don't need a proxy, set it to None.
 # Example: PROXY = None
-# PROXY = 'http://127.0.0.1:10809'
-PROXY = None
+PROXY = 'http://127.0.0.1:10809'
+# PROXY = None
 
 # --- Analysis Settings ---
 # List of symbols to analyze
@@ -63,5 +63,17 @@ VIRTUAL_TRADE_CONFIG = {
         "ATR_MULTIPLIER_FOR_SL": 2.0    # Wider SL for ETH: 2.2 * ATR
     }
     # You can add other symbols here, e.g., "SOL/USDT": {...}
+}
+
+
+# --- Reversal (Aggressive) Strategy Settings ---
+# Settings for the aggressive, counter-trend strategy.
+REVERSAL_STRATEGY_CONFIG = {
+    "enabled": True,  # Master switch for this strategy
+    "timeframe": "1h", # Timeframe to run this strategy on
+    "rsi_oversold": 28, # RSI level to trigger a long signal
+    "rsi_overbought": 72, # RSI level to trigger a short signal
+    "risk_per_trade_percent": 0.8, # Risk 0.8% of balance for this aggressive strategy
+    "atr_multiplier_for_sl": 1.5 # Use a tighter SL (1.5 * ATR) for reversal trades
 }
 
