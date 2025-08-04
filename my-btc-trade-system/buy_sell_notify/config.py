@@ -15,7 +15,8 @@ SECRET_KEY = "Ep9pRR8nahbFsTlCJllE8SD981CWygEcFhJ38kSWzvwKIpAXhYl85m4qC3fxKHkc"
 # --- Proxy Settings ---
 # If you don't need a proxy, set it to None.
 # Example: PROXY = None
-PROXY = None
+PROXY = 'http://127.0.0.1:10809'
+# PROXY = None
 
 # --- Analysis Settings ---
 # List of symbols to analyze

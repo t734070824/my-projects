@@ -21,8 +21,8 @@ class ListLogHandler(logging.Handler):
         self.log_list = log_list
 
     def emit(self, record):
-        # 将格式化后的消息追加到列表中
-        self.log_list.append(self.format(record))
+        # 只将原始消息追加到列表中，不包含时间、名称、级别等格式化信息
+        self.log_list.append(record.getMessage())
 
 # --- 原有代码区域 (保持完全不变) ---
 def manage_virtual_trade(symbol, final_decision, analysis_data):
@@ -267,8 +267,31 @@ def run_analysis_and_notify():
         # 1. 从系统中卸载我们的自定义处理器，避免重复记录
         root_logger.removeHandler(list_handler)
 
-        # 2. 将收集到的日志列表合并成一个字符串
-        captured_logs = "\n".join(ANALYSIS_LOGS)
+        # 2. 过滤日志，只保留关键信息
+        key_info_phrases = [
+            "================== 开始分析:",
+            "的ATR(周期:",
+            "长期趋势判断:",
+            "决策: ",
+            "REVERSAL SIGNAL ALERT",
+            "TRAILING STOP LOSS UPDATE",
+            "NEW VIRTUAL TRADE ALERT",
+            "信号冲突：",
+            "无法管理", # 虚拟交易管理中的错误
+            "无法获取账户状态", # 分析中止错误
+            "无法完成", # 分析跳过错误
+            "执行分析时发生严重错误", # 包装器中的错误
+            "================== 完成分析:"
+        ]
+        
+        filtered_logs = []
+        for log_entry in ANALYSIS_LOGS:
+            if any(phrase in log_entry for phrase in key_info_phrases):
+                filtered_logs.append(log_entry)
+        
+        # 3. 将收集到的日志列表合并成一个字符串
+        captured_logs = "\n".join(filtered_logs)
+
 
         # 3. 发送钉钉通知
         if captured_logs:
