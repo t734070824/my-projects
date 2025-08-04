@@ -66,7 +66,8 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
                     logger.warning(f"无法为 [{symbol}] 获取ATR，跳过追踪止损检查。")
                     continue
 
-                trade_config = config.VIRTUAL_TRADE_CONFIG
+                # --- 获取特定于交易对的虚拟交易配置 ---
+                trade_config = config.VIRTUAL_TRADE_CONFIG.get(symbol, config.VIRTUAL_TRADE_CONFIG["DEFAULT"])
                 stop_loss_distance = atr_info['atr'] * trade_config["ATR_MULTIPLIER_FOR_SL"]
                 
                 new_suggested_sl = None

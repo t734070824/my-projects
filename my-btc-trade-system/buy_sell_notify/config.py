@@ -48,8 +48,20 @@ ATR_CONFIG = {
 
 # --- Virtual Trading Settings ---
 # Settings for calculating virtual trade parameters.
+# A "DEFAULT" key is required as a fallback for symbols not explicitly listed.
 VIRTUAL_TRADE_CONFIG = {
-    "RISK_PER_TRADE_PERCENT": 2.0,  # Risk 1% of the available balance per trade
-    "ATR_MULTIPLIER_FOR_SL": 2.0   # Stop loss will be set at 2 * ATR from the entry price
+    "DEFAULT": {
+        "RISK_PER_TRADE_PERCENT": 1.0,  # Default risk: 1.5% of available balance
+        "ATR_MULTIPLIER_FOR_SL": 2.0    # Default SL: 2 * ATR
+    },
+    "BTC/USDT": {
+        "RISK_PER_TRADE_PERCENT": 3.0,  # Risk for BTC: 2%
+        "ATR_MULTIPLIER_FOR_SL": 2.0    # Tighter SL for BTC: 1.8 * ATR
+    },
+    "ETH/USDT": {
+        "RISK_PER_TRADE_PERCENT": 2.0,  # Risk for ETH: 1.8%
+        "ATR_MULTIPLIER_FOR_SL": 2.0    # Wider SL for ETH: 2.2 * ATR
+    }
+    # You can add other symbols here, e.g., "SOL/USDT": {...}
 }
 
