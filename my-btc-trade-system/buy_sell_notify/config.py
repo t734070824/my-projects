@@ -143,3 +143,11 @@ LOG_CONFIG = {
     "console_output": True,  # 是否同时输出到控制台
 }
 
+# --- Backup Settings ---
+# 日志备份配置
+BACKUP_CONFIG = {
+    "remove_original_after_backup": True,  # 备份后是否删除原始日志文件
+    "backup_retention_days": 30,  # 备份文件保留天数
+    "auto_cleanup_old_backups": True,  # 是否自动清理旧备份
+}
+

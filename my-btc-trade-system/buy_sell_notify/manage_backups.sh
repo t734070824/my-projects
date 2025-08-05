@@ -5,7 +5,8 @@
 
 show_help() {
     echo "日志备份管理脚本使用说明："
-    echo "  ./manage_backups.sh backup          - 立即备份当前日志"
+    echo "  ./manage_backups.sh backup          - 立即备份当前日志（备份后删除原文件）"
+    echo "  ./manage_backups.sh backup-keep     - 立即备份当前日志（保留原文件）"
     echo "  ./manage_backups.sh list            - 列出所有备份"
     echo "  ./manage_backups.sh clean [days]    - 清理N天前的备份 (默认30天)"
     echo "  ./manage_backups.sh restore [backup] - 从备份恢复日志"
@@ -48,8 +49,13 @@ list_backups() {
 }
 
 backup_now() {
-    echo "=== 立即备份当前日志 ==="
-    python3 backup_logs.py
+    echo "=== 立即备份当前日志（删除原文件）==="
+    python3 backup_logs.py --remove-original
+}
+
+backup_keep() {
+    echo "=== 立即备份当前日志（保留原文件）==="
+    python3 backup_logs.py --keep-original
 }
 
 clean_old_backups() {
@@ -134,6 +140,9 @@ show_backup_size() {
 case "${1:-help}" in
     "backup")
         backup_now
+        ;;
+    "backup-keep")
+        backup_keep
         ;;
     "list")
         list_backups

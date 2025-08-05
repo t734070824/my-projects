@@ -22,8 +22,12 @@ class ListLogHandler(logging.Handler):
         self.log_list = log_list
 
     def emit(self, record):
-        # 只将原始消息追加到列表中，不包含时间、名称、级别等格式化信息
-        self.log_list.append(record.getMessage())
+        # 使用格式器完整格式化日志消息，保留多行内容
+        if self.formatter:
+            formatted_message = self.formatter.format(record)
+        else:
+            formatted_message = record.getMessage()
+        self.log_list.append(formatted_message)
 
 # --- 原有代码区域 (保持完全不变) ---
 def manage_virtual_trade(symbol, final_decision, analysis_data):
@@ -459,7 +463,7 @@ def run_analysis_and_notify():
             log_entry = ANALYSIS_LOGS[i]
             
             # 检测交易信号开始（包括主策略和激进策略）
-            if any(signal_start in log_entry for signal_start in ["🚨 NEW TRADE SIGNAL 🚨", "🔥 REVERSAL TRADE SIGNAL 🔥"]):
+            if any(signal_start in log_entry for signal_start in ["NEW TRADE SIGNAL", "REVERSAL TRADE SIGNAL"]):
                 # 找到信号开始，收集整个信号块
                 signal_block = [log_entry]
                 j = i + 1
@@ -494,6 +498,36 @@ def run_analysis_and_notify():
         
         # 调试信息
         logging.info(f"交易详情捕获结果: 找到 {len(trade_details)} 个详细信号, {len(execute_signals)} 个简单信号")
+        logging.info(f"总共处理了 {len(ANALYSIS_LOGS)} 条日志记录")
+        
+        # 详细调试信息 - 显示所有包含关键词的日志
+        signal_related_logs = []
+        for log_entry in ANALYSIS_LOGS:
+            if any(keyword in log_entry for keyword in ["NEW TRADE SIGNAL", "REVERSAL TRADE SIGNAL", "决策: EXECUTE_"]):
+                signal_related_logs.append(log_entry)
+        
+        if signal_related_logs:
+            logging.info(f"发现 {len(signal_related_logs)} 条信号相关日志:")
+            for i, log in enumerate(signal_related_logs):
+                # 清理特殊字符用于控制台显示
+                clean_log = log.replace('🚨', '[ALERT]').replace('🔥', '[FIRE]')
+                logging.info(f"  信号日志 {i+1}: {clean_log[:150]}{'...' if len(clean_log) > 150 else ''}")
+        
+        if execute_signals:
+            logging.info("发现的简单信号:")
+            for i, signal in enumerate(execute_signals):
+                logging.info(f"  {i+1}: {signal}")
+        
+        if trade_details:
+            logging.info("发现的详细信号:")
+            for i, detail in enumerate(trade_details):
+                clean_detail = detail.replace('🚨', '[ALERT]').replace('🔥', '[FIRE]')
+                logging.info(f"  详细信号 {i+1}: {clean_detail[:200]}...")  # 显示前200个字符
+        else:
+            logging.warning("没有捕获到详细的交易信号!")
+            
+        # 额外调试：显示用于匹配的关键模式
+        logging.info("搜索的信号模式: ['NEW TRADE SIGNAL', 'REVERSAL TRADE SIGNAL']")
         
         if execute_signals:
             # 有交易信号时发送详细通知（包含持仓量、价格、止损等完整信息）
@@ -532,7 +566,7 @@ def run_analysis_and_notify():
                             max_loss = line.split("最大亏损:")[1].strip() if "最大亏损:" in line else ""
                     
                     # 判断策略类型
-                    is_reversal = "🔥 REVERSAL" in detail
+                    is_reversal = "REVERSAL TRADE SIGNAL" in detail
                     strategy_type = "激进反转策略" if is_reversal else "趋势跟踪策略"
                     strategy_emoji = "🔥" if is_reversal else "🚨"
                     

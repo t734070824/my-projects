@@ -24,9 +24,12 @@ def setup_backup_logger():
     logger.setLevel(logging.INFO)
     return logger
 
-def backup_logs():
+def backup_logs(remove_original=True):
     """
     备份日志文件到备份目录
+    
+    Args:
+        remove_original: 是否在备份后删除原始文件，默认True
     """
     logger = setup_backup_logger()
     
@@ -52,6 +55,7 @@ def backup_logs():
         # 备份所有日志文件
         backup_count = 0
         total_size = 0
+        files_to_remove = []  # 记录成功备份的文件，用于后续删除
         
         for log_file in log_dir.glob("*.log*"):
             if log_file.is_file():
@@ -61,6 +65,7 @@ def backup_logs():
                     file_size = log_file.stat().st_size
                     total_size += file_size
                     backup_count += 1
+                    files_to_remove.append(log_file)  # 记录成功备份的文件
                     logger.info(f"已备份: {log_file.name} ({file_size:,} bytes)")
                 except Exception as e:
                     logger.error(f"备份文件 {log_file.name} 失败: {e}")
@@ -70,16 +75,40 @@ def backup_logs():
             
             # 创建备份信息文件
             info_file = backup_dir / "backup_info.txt"
+            removed_count = 0
+            removed_size = 0
+            
             with open(info_file, 'w', encoding='utf-8') as f:
                 f.write(f"备份时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"备份文件数量: {backup_count}\n")
                 f.write(f"总大小: {total_size:,} bytes\n")
                 f.write(f"原始日志目录: {log_dir.absolute()}\n")
+                f.write(f"备份后已清理原文件: {remove_original}\n")
                 f.write("\n备份的文件列表:\n")
                 for log_file in backup_dir.glob("*.log*"):
                     if log_file.name != "backup_info.txt":
                         size = log_file.stat().st_size
                         f.write(f"- {log_file.name} ({size:,} bytes)\n")
+            
+            # 根据参数决定是否删除原始日志文件
+            if remove_original:
+                logger.info("开始清理已备份的原始日志文件...")
+                for log_file in files_to_remove:
+                    try:
+                        file_size = log_file.stat().st_size
+                        log_file.unlink()  # 删除文件
+                        removed_count += 1
+                        removed_size += file_size
+                        logger.info(f"已删除: {log_file.name} ({file_size:,} bytes)")
+                    except Exception as e:
+                        logger.error(f"删除文件 {log_file.name} 失败: {e}")
+                
+                if removed_count > 0:
+                    logger.info(f"清理完成! 删除了 {removed_count} 个原始日志文件，释放空间: {removed_size:,} bytes")
+                else:
+                    logger.warning("没有删除任何原始日志文件")
+            else:
+                logger.info("已选择保留原始日志文件，备份完成")
             
             return True
         else:
@@ -140,14 +169,32 @@ def cleanup_old_backups(keep_days=30):
 
 def main():
     """主函数"""
+    import sys
+    
     logger = setup_backup_logger()
     logger.info("=== 开始执行日志备份任务 ===")
     
-    # 执行备份
-    backup_success = backup_logs()
+    # 检查命令行参数，如果没有指定则使用配置文件中的默认值
+    remove_original = config.BACKUP_CONFIG["remove_original_after_backup"]  # 使用配置文件默认值
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--keep-original":
+            remove_original = False
+            logger.info("使用 --keep-original 参数，将保留原始日志文件")
+        elif sys.argv[1] == "--remove-original":
+            remove_original = True
+            logger.info("使用 --remove-original 参数，将删除原始日志文件")
+    else:
+        action = "删除" if remove_original else "保留"
+        logger.info(f"使用配置文件默认设置：备份后{action}原始日志文件")
     
-    # 清理旧备份
-    cleanup_old_backups(keep_days=30)
+    # 执行备份
+    backup_success = backup_logs(remove_original=remove_original)
+    
+    # 清理旧备份（如果启用了自动清理）
+    if config.BACKUP_CONFIG["auto_cleanup_old_backups"]:
+        cleanup_old_backups(keep_days=config.BACKUP_CONFIG["backup_retention_days"])
+    else:
+        logger.info("自动清理旧备份功能已禁用")
     
     logger.info("=== 日志备份任务完成 ===")
     return backup_success
