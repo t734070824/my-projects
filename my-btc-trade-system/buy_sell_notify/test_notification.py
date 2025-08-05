@@ -123,9 +123,11 @@ def test_signal_processing():
 **策略类型**: {strategy_type}
 **交易方向**: {direction}
 **入场价格**: {entry_price}
+**决策原因**: [DOT/USDT] 1d, 4h趋势看空，且1h出现卖出信号。
 
 **仓位信息**:
 - 持仓量: {position_size}
+- 持仓价值: 156.20 USDT
 - 止损价: {stop_loss}
 - 最大亏损: {max_loss}
 

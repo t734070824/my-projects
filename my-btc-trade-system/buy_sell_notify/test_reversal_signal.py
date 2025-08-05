@@ -150,6 +150,8 @@ def test_reversal_signal_capture():
                     extracted_info['entry_price'] = line.split("入场价格:")[1].strip() if "入场价格:" in line else ""
                 elif "持仓量:" in line:
                     extracted_info['position_size'] = line.split("持仓量:")[1].strip() if "持仓量:" in line else ""
+                elif "持仓价值:" in line:
+                    extracted_info['position_value'] = line.split("持仓价值:")[1].strip() if "持仓价值:" in line else ""
             
             print("  提取的关键信息:")
             for key, value in extracted_info.items():

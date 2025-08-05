@@ -491,12 +491,23 @@ def run_analysis_and_notify():
         alerts = []
         errors = []
         
-        # 同时收集完整的交易信号详情
+        # 同时收集完整的交易信号详情和对应的决策原因
         trade_details = []
-        in_trade_signal = False
-        current_signal = []
+        signal_decisions = {}  # 存储交易对 -> 决策原因的映射
         
-        # 先完整遍历一遍收集交易详情
+        # 先收集所有决策原因，建立交易对映射
+        for log_entry in ANALYSIS_LOGS:
+            if "决策: EXECUTE_" in log_entry and " - 原因: " in log_entry:
+                try:
+                    # 提取交易对信息
+                    if "[" in log_entry and "]" in log_entry:
+                        symbol_part = log_entry.split("[")[1].split("]")[0]
+                        decision_reason = log_entry.split(" - 原因: ")[1] if " - 原因: " in log_entry else ""
+                        signal_decisions[symbol_part] = decision_reason
+                except:
+                    continue
+        
+        # 收集交易详情
         i = 0
         while i < len(ANALYSIS_LOGS):
             log_entry = ANALYSIS_LOGS[i]
@@ -581,6 +592,7 @@ def run_analysis_and_notify():
                     direction = ""
                     entry_price = ""
                     position_size = ""
+                    position_value = ""  # 持仓价值（USDT数量）
                     stop_loss = ""
                     target1 = ""
                     target2 = ""
@@ -596,6 +608,8 @@ def run_analysis_and_notify():
                             entry_price = line.split("入场价格:")[1].strip() if "入场价格:" in line else ""
                         elif "持仓量:" in line:
                             position_size = line.split("持仓量:")[1].strip() if "持仓量:" in line else ""
+                        elif "持仓价值:" in line:
+                            position_value = line.split("持仓价值:")[1].strip() if "持仓价值:" in line else ""
                         elif "止损价格:" in line:
                             stop_loss = line.split("止损价格:")[1].strip() if "止损价格:" in line else ""
                         elif "ATR距离:" in line:
@@ -635,6 +649,9 @@ def run_analysis_and_notify():
                             atr_value = parts[0].strip()
                             atr_multiplier = parts[1].replace("x ATR)", "").strip()
                     
+                    # 获取对应的决策原因
+                    decision_reason = signal_decisions.get(symbol, "系统技术指标综合判断")
+                    
                     signal_title = f"{strategy_emoji} {symbol} {direction}"
                     
                     # 根据策略类型设置不同的操作提醒
@@ -650,9 +667,11 @@ def run_analysis_and_notify():
 **策略类型**: {strategy_type}
 **交易方向**: {direction}
 **入场价格**: {entry_price}
+**决策原因**: {decision_reason}
 
 **仓位信息**:
 - 持仓量: {position_size}
+- 持仓价值: {position_value}
 - 止损价: {stop_loss}
 - 最大亏损: {max_loss}
 
@@ -674,9 +693,11 @@ def run_analysis_and_notify():
                         markdown_text = f"""### **{strategy_emoji} {symbol} {direction}** `{current_time}`
 
 **策略**: {strategy_type}
+**原因**: {decision_reason}
 **价格**: {entry_price}
-**止损**: {stop_loss}
 **持仓**: {position_size}
+**价值**: {position_value}
+**止损**: {stop_loss}
 **ATR**: {atr_timeframe}/{atr_length}期 = {atr_value}
 
 ⚠️ 详细信息请查看系统日志
