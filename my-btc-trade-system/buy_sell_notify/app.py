@@ -178,19 +178,118 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         position_size_coin = risk_amount_usd / stop_loss_distance
         position_size_usd = position_size_coin * current_price
 
+        # 计算目标价位（2:1和3:1风险回报比）
+        risk_distance = abs(current_price - stop_loss_price)
+        target_price_2r = current_price + (2 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (2 * risk_distance)
+        target_price_3r = current_price + (3 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (3 * risk_distance)
+        
+        # 计算预期盈亏
+        potential_loss = risk_amount_usd  # 最大风险就是设定的风险金额
+        potential_profit_2r = risk_amount_usd * 2  # 2倍风险回报
+        potential_profit_3r = risk_amount_usd * 3  # 3倍风险回报
+        
         logger.warning(f"""
     ------------------------------------------------------------
-    |                 NEW VIRTUAL TRADE ALERT                  |
+    |                 🚨 NEW TRADE SIGNAL 🚨                   |
     ------------------------------------------------------------
-    | Symbol:           {symbol}
-    | Decision:         {final_decision}
+    | 交易对:           {symbol}
+    | 方向:             {final_decision.replace('EXECUTE_', '')}
+    | 入场价格:         {current_price:,.4f} USDT
+    | 
+    | === 仓位计算 ===
+    | 账户余额:         {available_balance:,.2f} USDT  
+    | 风险敞口:         {risk_per_trade:.1%} = {risk_amount_usd:,.2f} USDT
+    | 持仓量:           {position_size_coin:,.4f} {symbol.split('/')[0]}
+    | 持仓价值:         {position_size_usd:,.2f} USDT
     |
-    | Entry Price:      {current_price:,.4f}
-    | Initial Stop Loss:{stop_loss_price:,.4f} (Distance: {stop_loss_distance:,.4f})
+    | === 风险管理 ===
+    | 止损价格:         {stop_loss_price:,.4f} USDT
+    | ATR距离:          {stop_loss_distance:,.4f} ({atr_multiplier}x ATR)
+    | 最大亏损:         -{potential_loss:,.2f} USDT
     |
-    | Account Balance:  {available_balance:,.2f} USDT
-    | Risk Amount:      {risk_amount_usd:,.2f} USDT ({risk_per_trade:.2%})
-    | Position Size:    {position_size_coin:,.4f} {symbol.split('/')[0]} ({position_size_usd:,.2f} USDT)
+    | === 盈利目标 ===
+    | 目标1 (2R):       {target_price_2r:,.4f} USDT → +{potential_profit_2r:,.2f} USDT
+    | 目标2 (3R):       {target_price_3r:,.4f} USDT → +{potential_profit_3r:,.2f} USDT
+    | 
+    | 🎯 建议: 目标1处止盈50%，目标2处全部平仓
+    ------------------------------------------------------------
+    """)
+
+def manage_reversal_virtual_trade(symbol, final_decision, analysis_data):
+    """
+    管理激进反转策略的虚拟交易：使用更小的风险敞口和更紧的止损。
+    """
+    logger = logging.getLogger("ReversalTrader")
+    
+    # --- 提取所需数据 ---
+    current_price = analysis_data.get('close_price')
+    atr = analysis_data.get('atr_info', {}).get('atr')
+    account_status = analysis_data.get('account_status', {})
+    open_positions = account_status.get('open_positions', [])
+    available_balance_str = account_status.get('usdt_balance', {}).get('availableBalance')
+
+    if not all([current_price, atr, available_balance_str]):
+        logger.error(f"无法管理 {symbol} 的激进策略交易：缺少价格、ATR或余额信息。")
+        return
+
+    # --- 检查是否存在当前交易对的持仓 ---
+    existing_position = next((p for p in open_positions if p['symbol'].split(':')[0] == symbol), None)
+    
+    if existing_position:
+        logger.warning(f"[{symbol}] 激进策略信号被忽略：已存在持仓，避免冲突。")
+        return
+
+    # --- 使用激进策略的风险参数 ---
+    rev_config = config.REVERSAL_STRATEGY_CONFIG
+    available_balance = float(available_balance_str)
+    risk_per_trade = rev_config["risk_per_trade_percent"] / 100
+    atr_multiplier = rev_config["atr_multiplier_for_sl"]
+    stop_loss_distance = atr * atr_multiplier
+    
+    if final_decision == "EXECUTE_LONG":
+        stop_loss_price = current_price - stop_loss_distance
+    else: # EXECUTE_SHORT
+        stop_loss_price = current_price + stop_loss_distance
+
+    risk_amount_usd = available_balance * risk_per_trade
+    position_size_coin = risk_amount_usd / stop_loss_distance
+    position_size_usd = position_size_coin * current_price
+
+    # 计算目标价位（激进策略目标更保守：1.5R和2R）
+    risk_distance = abs(current_price - stop_loss_price)
+    target_price_15r = current_price + (1.5 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (1.5 * risk_distance)
+    target_price_2r = current_price + (2 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (2 * risk_distance)
+    
+    # 计算预期盈亏
+    potential_loss = risk_amount_usd
+    potential_profit_15r = risk_amount_usd * 1.5
+    potential_profit_2r = risk_amount_usd * 2
+
+    logger.warning(f"""
+    ------------------------------------------------------------
+    |                🔥 REVERSAL TRADE SIGNAL 🔥               |
+    ------------------------------------------------------------
+    | 交易对:           {symbol}
+    | 策略:             激进反转策略
+    | 方向:             {final_decision.replace('EXECUTE_', '')}
+    | 入场价格:         {current_price:,.4f} USDT
+    | 
+    | === 仓位计算 (激进策略) ===
+    | 账户余额:         {available_balance:,.2f} USDT  
+    | 风险敞口:         {risk_per_trade:.1%} = {risk_amount_usd:,.2f} USDT (较保守)
+    | 持仓量:           {position_size_coin:,.4f} {symbol.split('/')[0]}
+    | 持仓价值:         {position_size_usd:,.2f} USDT
+    |
+    | === 风险管理 ===
+    | 止损价格:         {stop_loss_price:,.4f} USDT
+    | ATR距离:          {stop_loss_distance:,.4f} ({atr_multiplier}x ATR, 更紧)
+    | 最大亏损:         -{potential_loss:,.2f} USDT
+    |
+    | === 盈利目标 (保守) ===
+    | 目标1 (1.5R):     {target_price_15r:,.4f} USDT → +{potential_profit_15r:,.2f} USDT
+    | 目标2 (2R):       {target_price_2r:,.4f} USDT → +{potential_profit_2r:,.2f} USDT
+    | 
+    | ⚡ 反转策略特点: 快进快出，严格止损，保守止盈
     ------------------------------------------------------------
     """)
 
@@ -269,21 +368,38 @@ def run_multi_symbol_analysis():
         logging.info(f"[{symbol}] 1小时线分析结果: {h1_analysis_str}")
         h1_signal = h1_analysis.get('signal', 'NEUTRAL')
 
-        # 4. 最终决策：三重时间周期过滤
-        logging.info(f"--- 4. [{symbol}] 最终决策 (三重过滤) ---")
+        # 4. 最终决策：三重时间周期过滤 + 激进策略
+        logging.info(f"--- 4. [{symbol}] 最终决策 (三重过滤 + 激进策略) ---")
         final_decision = "HOLD"
+        reversal_signal = h1_analysis.get('reversal_signal', 'NONE')
+        
+        # 主策略：三重时间周期过滤
         if is_long_term_bullish and is_mid_term_bullish and h1_signal in ['STRONG_BUY', 'WEAK_BUY']:
             final_decision = "EXECUTE_LONG"
             logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看多，且1h出现买入信号。")
         elif not is_long_term_bullish and not is_mid_term_bullish and h1_signal in ['STRONG_SELL', 'WEAK_SELL']:
             final_decision = "EXECUTE_SHORT"
             logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 1d, 4h趋势看空，且1h出现卖出信号。")
+        
+        # 激进策略：反转交易（独立于主策略）
+        elif reversal_signal in ['EXECUTE_REVERSAL_LONG', 'EXECUTE_REVERSAL_SHORT']:
+            if reversal_signal == 'EXECUTE_REVERSAL_LONG':
+                final_decision = "EXECUTE_LONG"
+                logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 激进反转策略 - RSI严重超卖且触及布林下轨。")
+            else:
+                final_decision = "EXECUTE_SHORT"  
+                logging.warning(f"决策: {final_decision} - 原因: [{symbol}] 激进反转策略 - RSI严重超买且触及布林上轨。")
+        
         else:
-            reason = f"1d({long_term_direction}) | 4h({'看多' if is_mid_term_bullish else '看空'}) | 1h({h1_signal})"
-            logging.info(f"决策: {final_decision} - 原因: [{symbol}] 时间周期信号冲突 ({reason})。建议观望。")
+            reason = f"1d({long_term_direction}) | 4h({'看多' if is_mid_term_bullish else '看空'}) | 1h({h1_signal}) | 反转({reversal_signal})"
+            logging.info(f"决策: {final_decision} - 原因: [{symbol}] 无符合条件的交易信号 ({reason})。建议观望。")
             
         # 5. 管理虚拟交易（开仓或追踪止损）
-        manage_virtual_trade(symbol, final_decision, h1_analysis)
+        # 为激进策略使用不同的风险参数
+        if reversal_signal in ['EXECUTE_REVERSAL_LONG', 'EXECUTE_REVERSAL_SHORT']:
+            manage_reversal_virtual_trade(symbol, final_decision, h1_analysis)
+        else:
+            manage_virtual_trade(symbol, final_decision, h1_analysis)
 
         logging.info(f"==完成分析: {symbol} \n")
 
@@ -322,7 +438,24 @@ def run_analysis_and_notify():
         alerts = []
         errors = []
         
+        # 同时收集完整的交易信号详情
+        trade_details = []
+        in_trade_signal = False
+        current_signal = []
+        
         for log_entry in ANALYSIS_LOGS:
+            # 检测交易信号开始（包括主策略和激进策略）
+            if any(signal_start in log_entry for signal_start in ["🚨 NEW TRADE SIGNAL 🚨", "🔥 REVERSAL TRADE SIGNAL 🔥"]):
+                in_trade_signal = True
+                current_signal = [log_entry]
+            elif in_trade_signal and "----" in log_entry and current_signal:
+                current_signal.append(log_entry)
+                trade_details.append("\n".join(current_signal))
+                in_trade_signal = False
+                current_signal = []
+            elif in_trade_signal:
+                current_signal.append(log_entry)
+            
             if "决策: EXECUTE_" in log_entry:
                 execute_signals.append(log_entry)
             elif "长期趋势判断:" in log_entry:
@@ -336,10 +469,29 @@ def run_analysis_and_notify():
         current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
         
         if execute_signals:
-            # 有交易信号时发送重要通知
+            # 有交易信号时发送详细通知（包含持仓量、价格、止损等完整信息）
             title = f"🚨 交易信号 - {len(execute_signals)}个"
-            signal_text = "\n".join([f"- {signal.split(' - 原因: ')[0].replace('决策: ', '')}" for signal in execute_signals])
-            markdown_text = f"""### **🚨 交易信号提醒** `{current_time}`
+            
+            if trade_details:
+                # 发送完整的交易详情
+                for i, detail in enumerate(trade_details):
+                    signal_title = f"🚨 交易信号 #{i+1}"
+                    markdown_text = f"""### **🚨 交易信号详情** `{current_time}`
+
+```
+{detail}
+```
+
+⚠️ **风险提醒**: 
+- 严格执行止损策略
+- 建议分批止盈
+- 密切关注市场变化
+"""
+                    send_dingtalk_markdown(signal_title, markdown_text)
+            else:
+                # 备用简化格式
+                signal_text = "\n".join([f"- {signal.split(' - 原因: ')[0].replace('决策: ', '')}" for signal in execute_signals])
+                markdown_text = f"""### **🚨 交易信号提醒** `{current_time}`
 
 **发现 {len(execute_signals)} 个交易信号:**
 {signal_text}
@@ -349,7 +501,7 @@ def run_analysis_and_notify():
 {chr(10).join(execute_signals)}
 ```
 """
-            send_dingtalk_markdown(title, markdown_text)
+                send_dingtalk_markdown(title, markdown_text)
         
         if alerts:
             # 有持仓调整建议时发送提醒
