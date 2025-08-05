@@ -29,7 +29,7 @@ SYMBOLS_TO_ANALYZE = [
     # Tier 3: 中市值活跃币 (1B-10B)
     'DOGE/USDT', 'SUI/USDT', 'LINK/USDT', 'NEAR/USDT', 'UNI/USDT',
     # Tier 4: 高波动小市值
-    'PEPE/USDT', 'WIF/USDT', 'BONK/USDT'
+    'PEPE/USDT', 'WIF/USDT'
 ]
 
 # --- Scheduler Settings ---
@@ -115,10 +115,6 @@ VIRTUAL_TRADE_CONFIG = {
     },
     "WIF/USDT": {
         "RISK_PER_TRADE_PERCENT": 1.5,
-        "ATR_MULTIPLIER_FOR_SL": 1.5
-    },
-    "BONK/USDT": {
-        "RISK_PER_TRADE_PERCENT": 1.2,
         "ATR_MULTIPLIER_FOR_SL": 1.5
     }
 }
