@@ -16,8 +16,12 @@ echo ">>> 步骤 3/4: 正在停止并删除旧的容器 'buy_sell_sigal_test'...
 docker stop buy_sell_sigal_test || true
 docker rm buy_sell_sigal_test || true
 
-# 4. 启动新的容器
-echo ">>> 步骤 4/4: 正在启动新容器 'buy_sell_sigal_test'..."
-docker run -d --name buy_sell_sigal_test buy_sell_sigal
+# 4. 创建本地日志目录
+echo ">>> 步骤 4/5: 创建本地日志目录..."
+mkdir -p ./logs
+
+# 5. 启动新的容器（挂载日志目录）
+echo ">>> 步骤 5/5: 正在启动新容器 'buy_sell_sigal_test'（挂载日志目录）..."
+docker run -d --name buy_sell_sigal_test -v $(pwd)/logs:/app/logs buy_sell_sigal
 
 echo ">>> 部署成功完成！"

@@ -19,8 +19,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 6. 复制项目中的所有代码和配置文件到工作目录
 COPY . .
 
-# 7. 暴露HTTP服务器的8000端口
+# 7. 创建日志目录并设置权限
+RUN mkdir -p /app/logs && chmod 755 /app/logs
+
+# 8. 创建日志卷挂载点
+VOLUME ["/app/logs"]
+
+# 9. 暴露HTTP服务器的8001端口
 EXPOSE 8001
 
-# 8. 设置容器启动时要执行的命令
+# 10. 设置容器启动时要执行的命令
 CMD ["/usr/bin/supervisord", "-c", "/app/supervisord.conf"]

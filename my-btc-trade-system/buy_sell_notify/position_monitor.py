@@ -6,6 +6,7 @@ import math
 import config
 from signal_generator import get_account_status, get_atr_info
 from dingtalk_notifier import send_dingtalk_markdown
+from logger_config import setup_position_monitor_logger
 
 def find_associated_stop_loss_order(open_orders, position):
     """
@@ -147,18 +148,13 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 
 
 if __name__ == "__main__":
-    log_formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    log_formatter.converter = time.localtime
+    # --- 使用新的日志配置系统 ---
+    logger = setup_position_monitor_logger()
+    
+    # 确保根日志器也使用相同配置
     root_logger = logging.getLogger()
-    if root_logger.hasHandlers():
-        root_logger.handlers.clear()
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_formatter)
-    root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.handlers = logger.handlers
+    root_logger.setLevel(logger.level)
 
     logger = logging.getLogger("MainMonitor")
     logger.info("初始化交易所实例...")

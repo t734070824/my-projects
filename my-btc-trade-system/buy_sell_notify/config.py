@@ -131,3 +131,15 @@ REVERSAL_STRATEGY_CONFIG = {
     "atr_multiplier_for_sl": 1.5 # Use a tighter SL (1.5 * ATR) for reversal trades
 }
 
+# --- Logging Settings ---
+# 日志文件配置
+LOG_CONFIG = {
+    "log_dir": "./logs",  # 日志目录
+    "main_log_file": "trading_system.log",  # 主程序日志
+    "position_log_file": "position_monitor.log",  # 仓位监控日志
+    "max_log_size_mb": 50,  # 单个日志文件最大大小(MB)
+    "backup_count": 5,  # 保留的日志备份数量
+    "log_level": "INFO",  # 日志级别: DEBUG, INFO, WARNING, ERROR
+    "console_output": True,  # 是否同时输出到控制台
+}
+

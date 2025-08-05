@@ -9,6 +9,7 @@ import sys
 import config
 from signal_generator import SignalGenerator, get_account_status, get_atr_info
 from dingtalk_notifier import send_dingtalk_markdown
+from logger_config import setup_main_logger
 
 # --- 新增：全局变量和自定义日志处理器 ---
 # 用于在内存中临时存储日志的列表
@@ -584,19 +585,13 @@ def run_analysis_and_notify():
 # --- 主程序入口 (修改定时任务的目标) ---
 def main():
     """主函数 - 设置定时任务并启动独立监控进程"""
-    # --- 配置日志以使用本地时间 ---
-    log_formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    log_formatter.converter = time.localtime
+    # --- 使用新的日志配置系统 ---
+    logger = setup_main_logger()
+    
+    # 确保根日志器也使用相同配置
     root_logger = logging.getLogger()
-    if root_logger.hasHandlers():
-        root_logger.handlers.clear()
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(log_formatter)
-    root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.handlers = logger.handlers
+    root_logger.setLevel(logger.level)
 
     logging.info("=== 交易信号分析系统启动 (主程序) ===")
 

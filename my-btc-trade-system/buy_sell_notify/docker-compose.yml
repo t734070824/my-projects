@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  trading-system:
+    build: .
+    container_name: buy_sell_sigal_container
+    volumes:
+      # 挂载日志目录到宿主机当前目录下的logs文件夹
+      - ./logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+    # 如果需要网络代理，可以添加网络配置
+    # network_mode: "host"
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/logs/trading_system.log') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
