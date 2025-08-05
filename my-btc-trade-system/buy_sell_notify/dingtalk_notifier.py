@@ -39,6 +39,14 @@ def send_dingtalk_markdown(title: str, markdown_text: str):
         logger.debug("未检测到钉钉Secret，将使用普通模式发送。")
 
     try:
+        # 检查消息大小，钉钉限制20000字节
+        message_size = len(markdown_text.encode('utf-8'))
+        if message_size > 19000:  # 留1000字节缓冲
+            logger.warning(f"消息过大 ({message_size} bytes)，将截断处理")
+            # 截断消息并添加提示
+            max_chars = 19000 // 3  # 粗略估算，UTF-8中文字符约3字节
+            markdown_text = markdown_text[:max_chars] + "\n\n⚠️ 消息过长已截断，完整信息请查看系统日志"
+        
         # 准备请求数据 (这部分对于两种模式是相同的)
         headers = {'Content-Type': 'application/json'}
         payload = {
@@ -55,9 +63,25 @@ def send_dingtalk_markdown(title: str, markdown_text: str):
 
         result = response.json()
         if result.get("errcode") == 0:
-            logger.info(f"成功发送钉钉通知，标题: '{title}'")
+            logger.info(f"成功发送钉钉通知，标题: '{title}' (大小: {message_size} bytes)")
         else:
             logger.error(f"发送钉钉通知失败: {result}")
+            # 如果是消息过大错误，尝试发送超精简版本
+            if result.get("errcode") == 460101:
+                logger.warning("消息过大，尝试发送超精简版本")
+                simple_payload = {
+                    "msgtype": "markdown",
+                    "markdown": {
+                        "title": title,
+                        "text": f"### {title}\n\n⚠️ 原消息过大，请查看系统日志获取详细信息\n\n时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    }
+                }
+                fallback_response = requests.post(final_url, json=simple_payload, headers=headers, timeout=15)
+                fallback_result = fallback_response.json()
+                if fallback_result.get("errcode") == 0:
+                    logger.info("超精简版本发送成功")
+                else:
+                    logger.error(f"超精简版本也发送失败: {fallback_result}")
 
     except requests.exceptions.RequestException as e:
         logger.error(f"发送钉钉通知时发生网络错误: {e}")

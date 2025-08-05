@@ -500,20 +500,73 @@ def run_analysis_and_notify():
             title = f"🚨 交易信号 - {len(execute_signals)}个"
             
             if trade_details:
-                # 发送完整的交易详情
+                # 发送精简的交易详情，避免超过钉钉20000字节限制
                 for i, detail in enumerate(trade_details):
-                    signal_title = f"🚨 交易信号 #{i+1}"
-                    markdown_text = f"""### **🚨 交易信号详情** `{current_time}`
+                    # 从详细信息中提取关键信息
+                    lines = detail.split('\n')
+                    symbol = ""
+                    direction = ""
+                    entry_price = ""
+                    position_size = ""
+                    stop_loss = ""
+                    target1 = ""
+                    target2 = ""
+                    max_loss = ""
+                    
+                    for line in lines:
+                        if "交易对:" in line:
+                            symbol = line.split("交易对:")[1].strip() if "交易对:" in line else ""
+                        elif "方向:" in line:
+                            direction = line.split("方向:")[1].strip() if "方向:" in line else ""
+                        elif "入场价格:" in line:
+                            entry_price = line.split("入场价格:")[1].strip() if "入场价格:" in line else ""
+                        elif "持仓量:" in line:
+                            position_size = line.split("持仓量:")[1].strip() if "持仓量:" in line else ""
+                        elif "止损价格:" in line:
+                            stop_loss = line.split("止损价格:")[1].strip() if "止损价格:" in line else ""
+                        elif "目标1" in line and "R):" in line:
+                            target1 = line.split("R):")[1].strip() if "R):" in line else ""
+                        elif "目标2" in line and "R):" in line:
+                            target2 = line.split("R):")[1].strip() if "R):" in line else ""
+                        elif "最大亏损:" in line:
+                            max_loss = line.split("最大亏损:")[1].strip() if "最大亏损:" in line else ""
+                    
+                    # 判断策略类型
+                    is_reversal = "🔥 REVERSAL" in detail
+                    strategy_type = "激进反转策略" if is_reversal else "趋势跟踪策略"
+                    strategy_emoji = "🔥" if is_reversal else "🚨"
+                    
+                    signal_title = f"{strategy_emoji} {symbol} {direction}"
+                    markdown_text = f"""### **{strategy_emoji} 交易信号: {symbol}** `{current_time}`
 
-```
-{detail}
-```
+**策略类型**: {strategy_type}
+**交易方向**: {direction}
+**入场价格**: {entry_price}
 
-⚠️ **风险提醒**: 
-- 严格执行止损策略
-- 建议分批止盈
-- 密切关注市场变化
+**仓位信息**:
+- 持仓量: {position_size}
+- 止损价: {stop_loss}
+- 最大亏损: {max_loss}
+
+**目标价位**:
+- 目标1: {target1}
+- 目标2: {target2}
+
+⚠️ **操作提醒**: 严格执行止损，建议分批止盈
 """
+                    # 检查消息长度，确保不超过限制
+                    if len(markdown_text.encode('utf-8')) > 18000:  # 留2000字节缓冲
+                        # 如果还是太长，使用超精简版本
+                        markdown_text = f"""### **{strategy_emoji} {symbol} {direction}** `{current_time}`
+
+**策略**: {strategy_type}
+**价格**: {entry_price}
+**止损**: {stop_loss}
+**持仓**: {position_size}
+
+⚠️ 详细信息请查看系统日志
+"""
+                    
                     send_dingtalk_markdown(signal_title, markdown_text)
             else:
                 # 当没有捕获到详细信号时，尝试手动构建详细信息
