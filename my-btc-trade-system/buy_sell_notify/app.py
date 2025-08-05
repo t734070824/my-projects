@@ -68,19 +68,58 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         )
 
         if is_reversal_signal:
+            # 对于反转信号，生成完整的交易信号通知（包含详细的仓位信息）
+            available_balance = float(available_balance_str)
+            risk_per_trade = trade_config["RISK_PER_TRADE_PERCENT"] / 100
+            
+            if final_decision == "EXECUTE_LONG":
+                stop_loss_price = current_price - stop_loss_distance
+            else: # EXECUTE_SHORT
+                stop_loss_price = current_price + stop_loss_distance
+
+            risk_amount_usd = available_balance * risk_per_trade
+            position_size_coin = risk_amount_usd / stop_loss_distance
+            position_size_usd = position_size_coin * current_price
+
+            # 计算目标价位（2:1和3:1风险回报比）
+            risk_distance = abs(current_price - stop_loss_price)
+            target_price_2r = current_price + (2 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (2 * risk_distance)
+            target_price_3r = current_price + (3 * risk_distance) if final_decision == "EXECUTE_LONG" else current_price - (3 * risk_distance)
+            
+            # 计算预期盈亏
+            potential_loss = risk_amount_usd
+            potential_profit_2r = risk_amount_usd * 2
+            potential_profit_3r = risk_amount_usd * 3
+            
             logger.warning(f"""
     ------------------------------------------------------------
-    |                  REVERSAL SIGNAL ALERT                   |
+    |                 🔄 NEW TRADE SIGNAL 🔄                   |
+    |                   (反转信号)                              |
     ------------------------------------------------------------
-    | Symbol:           {symbol}
-    | Current Position: {position_side.upper()}
-    | New Signal:       {final_decision}
+    | 交易对:           {symbol}
+    | 当前持仓:         {position_side.upper()}
+    | 新信号方向:       {final_decision.replace('EXECUTE_', '')}
+    | 入场价格:         {current_price:,.4f} USDT
+    | 
+    | === 仓位计算 ===
+    | 账户余额:         {available_balance:,.2f} USDT  
+    | 风险敞口:         {risk_per_trade:.1%} = {risk_amount_usd:,.2f} USDT
+    | 持仓量:           {position_size_coin:,.4f} {symbol.split('/')[0]}
+    | 持仓价值:         {position_size_usd:,.2f} USDT
     |
-    | ACTION:           Consider closing the current position and
-    |                   evaluating the new signal for entry.
+    | === 风险管理 ===
+    | 止损价格:         {stop_loss_price:,.4f} USDT
+    | ATR距离:          {stop_loss_distance:,.4f} ({atr_multiplier}x ATR)
+    | 最大亏损:         -{potential_loss:,.2f} USDT
+    |
+    | === 盈利目标 ===
+    | 目标1 (2R):       {target_price_2r:,.4f} USDT → +{potential_profit_2r:,.2f} USDT
+    | 目标2 (3R):       {target_price_3r:,.4f} USDT → +{potential_profit_3r:,.2f} USDT
+    | 
+    | ⚠️  重要提醒: 建议先平仓当前{position_side.upper()}仓位，再考虑开{final_decision.replace('EXECUTE_', '')}仓
     ------------------------------------------------------------
     """)
-            return # 发现反转信号，停止后续操作
+            return # 发现反转信号，生成通知后停止后续操作
 
         # 如果不是反转信号，则执行原有的追踪止损逻辑
         entry_price = float(existing_position['entryPrice'])
@@ -546,6 +585,7 @@ def run_analysis_and_notify():
                     target1 = ""
                     target2 = ""
                     max_loss = ""
+                    atr_distance = ""  # ATR距离信息
                     
                     for line in lines:
                         if "交易对:" in line:
@@ -558,6 +598,8 @@ def run_analysis_and_notify():
                             position_size = line.split("持仓量:")[1].strip() if "持仓量:" in line else ""
                         elif "止损价格:" in line:
                             stop_loss = line.split("止损价格:")[1].strip() if "止损价格:" in line else ""
+                        elif "ATR距离:" in line:
+                            atr_distance = line.split("ATR距离:")[1].strip() if "ATR距离:" in line else ""
                         elif "目标1" in line and "R):" in line:
                             target1 = line.split("R):")[1].strip() if "R):" in line else ""
                         elif "目标2" in line and "R):" in line:
@@ -565,12 +607,44 @@ def run_analysis_and_notify():
                         elif "最大亏损:" in line:
                             max_loss = line.split("最大亏损:")[1].strip() if "最大亏损:" in line else ""
                     
-                    # 判断策略类型
-                    is_reversal = "REVERSAL TRADE SIGNAL" in detail
-                    strategy_type = "激进反转策略" if is_reversal else "趋势跟踪策略"
-                    strategy_emoji = "🔥" if is_reversal else "🚨"
+                    # 判断策略类型（支持三种类型）
+                    is_aggressive_reversal = "REVERSAL TRADE SIGNAL" in detail  # 激进反转策略
+                    is_position_reversal = "(反转信号)" in detail  # 已有持仓的反转信号
+                    
+                    if is_aggressive_reversal:
+                        strategy_type = "激进反转策略"
+                        strategy_emoji = "🔥"
+                    elif is_position_reversal:
+                        strategy_type = "仓位反转信号"
+                        strategy_emoji = "🔄"
+                    else:
+                        strategy_type = "趋势跟踪策略"
+                        strategy_emoji = "🚨"
+                    
+                    # 从交易对配置中获取ATR参数
+                    atr_config = config.ATR_CONFIG.get(symbol, config.ATR_CONFIG["DEFAULT"])
+                    atr_timeframe = atr_config["timeframe"]
+                    atr_length = atr_config["length"]
+                    
+                    # 从ATR距离信息中提取ATR数值（格式: "0.1879 (2.2x ATR)"）
+                    atr_value = ""
+                    atr_multiplier = ""
+                    if atr_distance:
+                        if "(" in atr_distance and "x ATR)" in atr_distance:
+                            parts = atr_distance.split("(")
+                            atr_value = parts[0].strip()
+                            atr_multiplier = parts[1].replace("x ATR)", "").strip()
                     
                     signal_title = f"{strategy_emoji} {symbol} {direction}"
+                    
+                    # 根据策略类型设置不同的操作提醒
+                    if is_position_reversal:
+                        operation_reminder = "🔄 **重要提醒**: 检测到反转信号！建议先平仓当前持仓，再考虑开新仓"
+                    elif is_aggressive_reversal:
+                        operation_reminder = "🔥 **激进策略**: 快进快出，严格止损，保守止盈"
+                    else:
+                        operation_reminder = "⚠️ **操作提醒**: 严格执行止损，建议分批止盈"
+                    
                     markdown_text = f"""### **{strategy_emoji} 交易信号: {symbol}** `{current_time}`
 
 **策略类型**: {strategy_type}
@@ -582,11 +656,17 @@ def run_analysis_and_notify():
 - 止损价: {stop_loss}
 - 最大亏损: {max_loss}
 
+**技术指标**:
+- ATR周期: {atr_timeframe}
+- ATR时长: {atr_length}期
+- ATR数值: {atr_value}
+- 止损倍数: {atr_multiplier}x ATR
+
 **目标价位**:
 - 目标1: {target1}
 - 目标2: {target2}
 
-⚠️ **操作提醒**: 严格执行止损，建议分批止盈
+{operation_reminder}
 """
                     # 检查消息长度，确保不超过限制
                     if len(markdown_text.encode('utf-8')) > 18000:  # 留2000字节缓冲
@@ -597,6 +677,7 @@ def run_analysis_and_notify():
 **价格**: {entry_price}
 **止损**: {stop_loss}
 **持仓**: {position_size}
+**ATR**: {atr_timeframe}/{atr_length}期 = {atr_value}
 
 ⚠️ 详细信息请查看系统日志
 """

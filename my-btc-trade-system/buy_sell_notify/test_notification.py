@@ -129,6 +129,12 @@ def test_signal_processing():
 - 止损价: {stop_loss}
 - 最大亏损: {max_loss}
 
+**技术指标**:
+- ATR周期: 4h
+- ATR时长: 20期
+- ATR数值: 0.1879
+- 止损倍数: 2.2x ATR
+
 **目标价位**:
 - 目标1: {target1}
 - 目标2: {target2}
