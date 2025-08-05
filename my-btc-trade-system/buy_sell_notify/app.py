@@ -316,6 +316,8 @@ def run_multi_symbol_analysis():
         return
 
     # --- 2. 循环分析每个交易对 ---
+    logging.info(f"开始分析 {len(config.SYMBOLS_TO_ANALYZE)} 个交易对: {', '.join(config.SYMBOLS_TO_ANALYZE)}")
+    
     for symbol in config.SYMBOLS_TO_ANALYZE:
         logging.info(f"=== 开始分析: {symbol} ")
         
@@ -393,6 +395,13 @@ def run_multi_symbol_analysis():
         else:
             reason = f"1d({long_term_direction}) | 4h({'看多' if is_mid_term_bullish else '看空'}) | 1h({h1_signal}) | 反转({reversal_signal})"
             logging.info(f"决策: {final_decision} - 原因: [{symbol}] 无符合条件的交易信号 ({reason})。建议观望。")
+            
+            # 详细调试信息
+            daily_score = daily_analysis.get('total_score', 0)
+            h4_score = h4_analysis.get('total_score', 0)
+            logging.info(f"[{symbol}] 详细评分: 日线={daily_score}, 4h线={h4_score}, 1h信号={h1_signal}")
+            logging.info(f"[{symbol}] 做多条件检查: 1d看多({is_long_term_bullish}) && 4h看多({is_mid_term_bullish}) && 1h买入({h1_signal in ['STRONG_BUY', 'WEAK_BUY']})")
+            logging.info(f"[{symbol}] 做空条件检查: 1d看空({not is_long_term_bullish}) && 4h看空({not is_mid_term_bullish}) && 1h卖出({h1_signal in ['STRONG_SELL', 'WEAK_SELL']})")
             
         # 5. 管理虚拟交易（开仓或追踪止损）
         # 为激进策略使用不同的风险参数
