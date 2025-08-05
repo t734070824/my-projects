@@ -443,30 +443,47 @@ def run_analysis_and_notify():
         in_trade_signal = False
         current_signal = []
         
-        for log_entry in ANALYSIS_LOGS:
+        # 先完整遍历一遍收集交易详情
+        i = 0
+        while i < len(ANALYSIS_LOGS):
+            log_entry = ANALYSIS_LOGS[i]
+            
             # 检测交易信号开始（包括主策略和激进策略）
             if any(signal_start in log_entry for signal_start in ["🚨 NEW TRADE SIGNAL 🚨", "🔥 REVERSAL TRADE SIGNAL 🔥"]):
-                in_trade_signal = True
-                current_signal = [log_entry]
-            elif in_trade_signal and "----" in log_entry and current_signal:
-                current_signal.append(log_entry)
-                trade_details.append("\n".join(current_signal))
-                in_trade_signal = False
-                current_signal = []
-            elif in_trade_signal:
-                current_signal.append(log_entry)
-            
+                # 找到信号开始，收集整个信号块
+                signal_block = [log_entry]
+                j = i + 1
+                # 继续收集直到遇到结束标记
+                while j < len(ANALYSIS_LOGS):
+                    next_entry = ANALYSIS_LOGS[j]
+                    signal_block.append(next_entry)
+                    # 如果遇到结束的分隔线，就停止收集
+                    if "----" in next_entry and len(signal_block) > 5:
+                        break
+                    j += 1
+                
+                if len(signal_block) > 1:
+                    trade_details.append("\n".join(signal_block))
+                i = j + 1
+            else:
+                i += 1
+        
+        # 然后正常收集其他信息
+        for log_entry in ANALYSIS_LOGS:
             if "决策: EXECUTE_" in log_entry:
                 execute_signals.append(log_entry)
             elif "长期趋势判断:" in log_entry:
                 trend_analysis.append(log_entry)
-            elif any(alert in log_entry for alert in ["TRAILING STOP LOSS UPDATE", "NEW VIRTUAL TRADE ALERT", "HIGH PROFIT ALERT"]):
+            elif any(alert in log_entry for alert in ["TRAILING STOP LOSS UPDATE", "HIGH PROFIT ALERT"]):
                 alerts.append(log_entry)
             elif any(error in log_entry for error in ["无法管理", "无法获取", "无法完成", "严重错误"]):
                 errors.append(log_entry)
 
         # 3. 生成结构化的通知内容
         current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+        
+        # 调试信息
+        logging.info(f"交易详情捕获结果: 找到 {len(trade_details)} 个详细信号, {len(execute_signals)} 个简单信号")
         
         if execute_signals:
             # 有交易信号时发送详细通知（包含持仓量、价格、止损等完整信息）
@@ -489,19 +506,38 @@ def run_analysis_and_notify():
 """
                     send_dingtalk_markdown(signal_title, markdown_text)
             else:
-                # 备用简化格式
-                signal_text = "\n".join([f"- {signal.split(' - 原因: ')[0].replace('决策: ', '')}" for signal in execute_signals])
-                markdown_text = f"""### **🚨 交易信号提醒** `{current_time}`
+                # 当没有捕获到详细信号时，尝试手动构建详细信息
+                logging.warning("未捕获到详细交易信号，将手动构建详细通知")
+                
+                # 为每个信号手动构建详细信息
+                for signal in execute_signals:
+                    if " - 原因: " in signal:
+                        parts = signal.split(" - 原因: ")
+                        decision = parts[0].replace("决策: ", "")
+                        reason = parts[1] if len(parts) > 1 else "未知原因"
+                        
+                        # 从原因中提取交易对
+                        symbol = ""
+                        if "[" in reason and "]" in reason:
+                            symbol = reason.split("[")[1].split("]")[0]
+                        
+                        signal_title = f"🚨 {symbol} {decision}"
+                        markdown_text = f"""### **🚨 交易信号: {symbol}** `{current_time}`
 
-**发现 {len(execute_signals)} 个交易信号:**
-{signal_text}
+**交易方向**: {decision}
+**信号原因**: {reason}
 
-**详细信息:**
-```
-{chr(10).join(execute_signals)}
-```
+⚠️ **注意**: 详细的仓位信息请查看系统日志，包括：
+- 建议持仓量和风险敞口
+- 止损价格和ATR距离  
+- 目标价位和预期盈利
+
+**风险提醒**: 
+- 严格执行止损策略
+- 建议分批止盈
+- 密切关注市场变化
 """
-                send_dingtalk_markdown(title, markdown_text)
+                        send_dingtalk_markdown(signal_title, markdown_text)
         
         if alerts:
             # 有持仓调整建议时发送提醒
