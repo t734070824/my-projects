@@ -81,34 +81,80 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
         entry_price = float(existing_position['entryPrice'])
         logger.info(f"发现已持有 [{symbol}] 的 {position_side.upper()} 仓位，将检查追踪止损条件。")
         
+        # 计算盈亏情况
+        unrealized_pnl = float(existing_position.get('unrealizedPnl', 0))
+        pnl_percent = (unrealized_pnl / (entry_price * abs(float(existing_position['size'])))) * 100
+        
         if position_side == 'long':
+            # 长仓追踪止损逻辑
             if current_price > entry_price + stop_loss_distance:
                 new_stop_loss = current_price - stop_loss_distance
                 if new_stop_loss > entry_price:
-                    logger.warning(f"""
+                    # 计算不同止盈阶段
+                    profit_ratio = (current_price - entry_price) / entry_price
+                    if profit_ratio >= 0.15:  # 盈利15%以上，建议部分止盈
+                        logger.warning(f"""
+    ------------------------------------------------------------
+    |             HIGH PROFIT ALERT & TRAILING SL             |
+    ------------------------------------------------------------
+    | Symbol:           {symbol} (LONG) - 建议部分止盈
+    | Entry Price:      {entry_price:,.4f}
+    | Current Price:    {current_price:,.4f} (+{profit_ratio:.1%})
+    | Unrealized P&L:   {unrealized_pnl:,.2f} USDT ({pnl_percent:+.1f}%)
+    | 
+    | SUGGESTION:       考虑止盈50%仓位锁定利润
+    | New Stop Loss:    {new_stop_loss:,.4f} (for remaining 50%)
+    ------------------------------------------------------------
+    """)
+                    elif profit_ratio >= 0.08:  # 盈利8%以上，正常追踪
+                        logger.warning(f"""
     ------------------------------------------------------------
     |               TRAILING STOP LOSS UPDATE                  |
     ------------------------------------------------------------
-    | Symbol:           {symbol} (LONG)
+    | Symbol:           {symbol} (LONG) - 利润保护模式
     | Entry Price:      {entry_price:,.4f}
-    | Current Price:    {current_price:,.4f}
+    | Current Price:    {current_price:,.4f} (+{profit_ratio:.1%})
+    | Unrealized P&L:   {unrealized_pnl:,.2f} USDT ({pnl_percent:+.1f}%)
     | New Stop Loss:    {new_stop_loss:,.4f} (Profit Locked)
     ------------------------------------------------------------
     """)
+                    else:  # 小幅盈利，保守追踪
+                        logger.info(f"[{symbol}] LONG仓位小幅盈利({profit_ratio:.1%})，建议继续持有，止损更新至{new_stop_loss:,.4f}")
+        
         elif position_side == 'short':
+            # 空仓追踪止损逻辑
             if current_price < entry_price - stop_loss_distance:
                 new_stop_loss = current_price + stop_loss_distance
                 if new_stop_loss < entry_price:
-                    logger.warning(f"""
+                    profit_ratio = (entry_price - current_price) / entry_price
+                    if profit_ratio >= 0.15:  # 盈利15%以上
+                        logger.warning(f"""
+    ------------------------------------------------------------
+    |             HIGH PROFIT ALERT & TRAILING SL             |
+    ------------------------------------------------------------
+    | Symbol:           {symbol} (SHORT) - 建议部分止盈
+    | Entry Price:      {entry_price:,.4f}
+    | Current Price:    {current_price:,.4f} (-{profit_ratio:.1%})
+    | Unrealized P&L:   {unrealized_pnl:,.2f} USDT ({pnl_percent:+.1f}%)
+    | 
+    | SUGGESTION:       考虑止盈50%仓位锁定利润
+    | New Stop Loss:    {new_stop_loss:,.4f} (for remaining 50%)
+    ------------------------------------------------------------
+    """)
+                    elif profit_ratio >= 0.08:  # 盈利8%以上
+                        logger.warning(f"""
     ------------------------------------------------------------
     |               TRAILING STOP LOSS UPDATE                  |
     ------------------------------------------------------------
-    | Symbol:           {symbol} (SHORT)
+    | Symbol:           {symbol} (SHORT) - 利润保护模式
     | Entry Price:      {entry_price:,.4f}
-    | Current Price:    {current_price:,.4f}
+    | Current Price:    {current_price:,.4f} (-{profit_ratio:.1%})
+    | Unrealized P&L:   {unrealized_pnl:,.2f} USDT ({pnl_percent:+.1f}%)
     | New Stop Loss:    {new_stop_loss:,.4f} (Profit Locked)
     ------------------------------------------------------------
     """)
+                    else:
+                        logger.info(f"[{symbol}] SHORT仓位小幅盈利({profit_ratio:.1%})，建议继续持有，止损更新至{new_stop_loss:,.4f}")
 
     else:
         # --- 逻辑1：没有持仓，检查是否有新的开仓信号 ---
@@ -270,40 +316,72 @@ def run_analysis_and_notify():
         # 1. 从系统中卸载我们的自定义处理器，避免重复记录
         root_logger.removeHandler(list_handler)
 
-        # 2. 过滤日志，只保留关键信息
-        key_info_phrases = [
-            "开始分析:",
-            "的ATR(周期:",
-            "长期趋势判断:",
-            "决策: ",
-            "REVERSAL SIGNAL ALERT",
-            "TRAILING STOP LOSS UPDATE",
-            "NEW VIRTUAL TRADE ALERT",
-            "信号冲突：",
-            "无法管理", # 虚拟交易管理中的错误
-            "无法获取账户状态", # 分析中止错误
-            "无法完成", # 分析跳过错误
-            "执行分析时发生严重错误", # 包装器中的错误
-            "完成分析:"
-        ]
+        # 2. 智能过滤和格式化日志
+        execute_signals = []
+        trend_analysis = []
+        alerts = []
+        errors = []
         
-        filtered_logs = []
         for log_entry in ANALYSIS_LOGS:
-            if any(phrase in log_entry for phrase in key_info_phrases):
-                filtered_logs.append(log_entry)
+            if "决策: EXECUTE_" in log_entry:
+                execute_signals.append(log_entry)
+            elif "长期趋势判断:" in log_entry:
+                trend_analysis.append(log_entry)
+            elif any(alert in log_entry for alert in ["TRAILING STOP LOSS UPDATE", "NEW VIRTUAL TRADE ALERT", "HIGH PROFIT ALERT"]):
+                alerts.append(log_entry)
+            elif any(error in log_entry for error in ["无法管理", "无法获取", "无法完成", "严重错误"]):
+                errors.append(log_entry)
+
+        # 3. 生成结构化的通知内容
+        current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
         
-        # 3. 将收集到的日志列表合并成一个字符串
-        captured_logs = "\n".join(filtered_logs)
+        if execute_signals:
+            # 有交易信号时发送重要通知
+            title = f"🚨 交易信号 - {len(execute_signals)}个"
+            signal_text = "\n".join([f"- {signal.split(' - 原因: ')[0].replace('决策: ', '')}" for signal in execute_signals])
+            markdown_text = f"""### **🚨 交易信号提醒** `{current_time}`
 
+**发现 {len(execute_signals)} 个交易信号:**
+{signal_text}
 
-        # 3. 发送钉钉通知
-        if captured_logs:
-            title = "每小时市场分析报告"
-            max_len = 18000 # 钉钉消息长度限制
-            if len(captured_logs) > max_len:
-                captured_logs = captured_logs[:max_len] + "\n\n... (消息过长，已被截断)"
-            
-            markdown_text = f"### **每小时市场分析报告**\n\n```\n{captured_logs}\n```"
+**详细信息:**
+```
+{chr(10).join(execute_signals)}
+```
+"""
+            send_dingtalk_markdown(title, markdown_text)
+        
+        if alerts:
+            # 有持仓调整建议时发送提醒
+            title = f"📊 持仓管理提醒 - {len(alerts)}个"
+            markdown_text = f"""### **📊 持仓管理提醒** `{current_time}`
+
+发现 {len(alerts)} 个持仓需要关注:
+```
+{chr(10).join(alerts[:3])}  
+```
+"""
+            send_dingtalk_markdown(title, markdown_text)
+        
+        # 发送简化的定时报告
+        summary_items = []
+        analyzed_symbols = len([log for log in ANALYSIS_LOGS if "开始分析:" in log])
+        
+        if analyzed_symbols > 0:
+            summary_items.append(f"✅ 已分析 {analyzed_symbols} 个交易对")
+        if execute_signals:
+            summary_items.append(f"🎯 发现 {len(execute_signals)} 个交易信号")
+        if alerts:
+            summary_items.append(f"⚠️ {len(alerts)} 个持仓需关注")
+        if errors:
+            summary_items.append(f"❌ {len(errors)} 个错误")
+        
+        if not execute_signals and not alerts:  # 只有在无重要事件时才发送定时摘要
+            title = f"📈 市场分析摘要"
+            markdown_text = f"""### **📈 市场分析摘要** `{current_time}`
+
+{chr(10).join(summary_items) if summary_items else "✅ 系统运行正常，暂无重要信号"}
+"""
             send_dingtalk_markdown(title, markdown_text)
 
 # --- 主程序入口 (修改定时任务的目标) ---

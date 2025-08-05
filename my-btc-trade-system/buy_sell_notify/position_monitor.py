@@ -42,9 +42,10 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 
             open_positions = account_status.get('open_positions', [])
             if not open_positions:
-                logger.info("当前无持仓，等待下一轮检查..."); time.sleep(config.MONITOR_INTERVAL_SECONDS); continue
+                logger.info("当前无持仓，降低监控频率..."); time.sleep(config.MONITOR_INTERVAL_NO_POSITION); continue
 
             # logger.info(f"监控 {len(open_positions)} 个真实仓位...")
+            has_high_profit_position = False  # 用于判断是否需要高频监控
 
             for position in open_positions:
                 symbol = position['symbol']
@@ -82,11 +83,21 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
                         new_suggested_sl = potential_new_sl
 
                 if new_suggested_sl:
+                    # 计算盈利情况判断是否为高盈利仓位
+                    profit_ratio = 0
+                    if side == 'long':
+                        profit_ratio = (current_price - entry_price) / entry_price
+                    else:
+                        profit_ratio = (entry_price - current_price) / entry_price
+                    
+                    if profit_ratio >= 0.10:  # 盈利10%以上视为高盈利
+                        has_high_profit_position = True
+                    
                     log_message = f"""
     ------------------------------------------------------------
     |             >>> TRAILING STOP-LOSS UPDATE <<<              |
     ------------------------------------------------------------
-    | Symbol:           {symbol} ({side.upper()})
+    | Symbol:           {symbol} ({side.upper()}) P&L: {profit_ratio:+.1%}
     | Entry Price:      {entry_price:,.4f}
     | Current Price:    {current_price:,.4f}
     |----------------------------------------------------------
@@ -97,28 +108,42 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
     """
                     logger.warning(log_message)
 
-                    # --- 新增：发送钉钉通知 ---
+                    # --- 发送钉钉通知 ---
                     title = f"止损更新建议: {symbol}"
-                    markdown_text = f"""### **止损更新建议: {symbol}**
+                    profit_indicator = "🔥高盈利" if profit_ratio >= 0.10 else "📈盈利中"
+                    markdown_text = f"""### **止损更新建议: {symbol}** {profit_indicator}
 
 - **持仓方向**: {side.upper()}
 - **开仓价格**: {entry_price:,.4f}
-- **当前价格**: {current_price:,.4f}
-- **当前止损**: {current_stop_price:,.4f}
+- **当前价格**: {current_price:,.4f} ({profit_ratio:+.1%})
+- **当前止损**: {current_stop_price:,.4f}  
 - **<font color='#FF0000'>建议新止损</font>**: **{new_suggested_sl:,.4f}**
 - **操作建议**: 取消旧订单({stop_loss_order['id']})，创建新止损单。
 """
                     send_dingtalk_markdown(title, markdown_text)
                 else:
-                    continue
-                    # logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。")
+                    # 检查现有持仓是否为高盈利（即使不需要调整止损）
+                    profit_ratio = 0
+                    if side == 'long':
+                        profit_ratio = (current_price - entry_price) / entry_price
+                    else:
+                        profit_ratio = (entry_price - current_price) / entry_price
+                    if profit_ratio >= 0.10:
+                        has_high_profit_position = True
 
         except ccxt.NetworkError as e:
             logger.error(f"监控时发生网络错误: {e}")
         except Exception as e:
             logger.error(f"监控循环发生未知错误: {e}", exc_info=True)
         
-        time.sleep(config.MONITOR_INTERVAL_SECONDS)
+        # 智能睡眠间隔：根据持仓情况动态调整
+        if has_high_profit_position:
+            sleep_time = config.MONITOR_INTERVAL_HIGH_PROFIT
+            logger.debug(f"检测到高盈利仓位，提高监控频率至{sleep_time}秒")
+        else:
+            sleep_time = config.MONITOR_INTERVAL_SECONDS
+        
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":
