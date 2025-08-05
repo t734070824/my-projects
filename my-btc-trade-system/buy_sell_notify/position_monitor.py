@@ -44,7 +44,7 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
             if not open_positions:
                 logger.info("当前无持仓，等待下一轮检查..."); time.sleep(config.MONITOR_INTERVAL_SECONDS); continue
 
-            logger.info(f"监控 {len(open_positions)} 个真实仓位...")
+            # logger.info(f"监控 {len(open_positions)} 个真实仓位...")
 
             for position in open_positions:
                 symbol = position['symbol']
