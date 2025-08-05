@@ -110,7 +110,8 @@ def monitor_existing_positions(exchange: ccxt.Exchange):
 """
                     send_dingtalk_markdown(title, markdown_text)
                 else:
-                    logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。")
+                    continue
+                    # logger.info(f"[{symbol}] 持仓稳定，当前止损位 {current_stop_price:,.4f} 合理，无需调整。")
 
         except ccxt.NetworkError as e:
             logger.error(f"监控时发生网络错误: {e}")
