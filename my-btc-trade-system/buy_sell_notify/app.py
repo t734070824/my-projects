@@ -50,8 +50,7 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
 
     # --- 检查是否存在当前交易对的持仓 (关键修复：处理':USDT' 后缀) ---
     existing_position = next((p for p in open_positions if p['symbol'].split(':')[0] == symbol), None)
-    existing_position = None
-    
+
     # --- 获取特定于交易对的虚拟交易配置 ---
     trade_config = config.VIRTUAL_TRADE_CONFIG.get(symbol, config.VIRTUAL_TRADE_CONFIG["DEFAULT"])
     logger.info(f"为 [{symbol}] 使用交易配置: {trade_config}")
