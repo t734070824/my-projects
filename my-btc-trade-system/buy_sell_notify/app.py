@@ -384,7 +384,9 @@ def run_multi_symbol_analysis():
             logging.error(f"无法完成 [{symbol}] 的战略层面分析，已跳过。")
             continue
 
-        daily_analysis_str = json.dumps(daily_analysis, indent=4, default=str, ensure_ascii=False)
+        # 创建不包含账户信息的分析结果副本用于日志输出
+        daily_analysis_log = {k: v for k, v in daily_analysis.items() if k not in ['account_status']}
+        daily_analysis_str = json.dumps(daily_analysis_log, indent=4, default=str, ensure_ascii=False)
         logging.info(f"[{symbol}] 日线分析结果: {daily_analysis_str}")
         is_long_term_bullish = daily_analysis.get('total_score', 0) > 0
         long_term_direction = "看多" if is_long_term_bullish else "看空/震荡"
@@ -398,7 +400,9 @@ def run_multi_symbol_analysis():
             logging.error(f"无法完成 [{symbol}] 的战术层面分析，已跳过。")
             continue
 
-        h4_analysis_str = json.dumps(h4_analysis, indent=4, default=str, ensure_ascii=False)
+        # 创建不包含账户信息的分析结果副本用于日志输出
+        h4_analysis_log = {k: v for k, v in h4_analysis.items() if k not in ['account_status']}
+        h4_analysis_str = json.dumps(h4_analysis_log, indent=4, default=str, ensure_ascii=False)
         logging.info(f"[{symbol}] 4小时线分析结果: {h4_analysis_str}")
         is_mid_term_bullish = h4_analysis.get('total_score', 0) > 0
 
@@ -410,7 +414,9 @@ def run_multi_symbol_analysis():
             logging.error(f"无法完成 [{symbol}] 的执行层面分析，已跳过。")
             continue
 
-        h1_analysis_str = json.dumps(h1_analysis, indent=4, default=str, ensure_ascii=False)
+        # 创建不包含账户信息的分析结果副本用于日志输出
+        h1_analysis_log = {k: v for k, v in h1_analysis.items() if k not in ['account_status']}
+        h1_analysis_str = json.dumps(h1_analysis_log, indent=4, default=str, ensure_ascii=False)
         logging.info(f"[{symbol}] 1小时线分析结果: {h1_analysis_str}")
         h1_signal = h1_analysis.get('signal', 'NEUTRAL')
 
