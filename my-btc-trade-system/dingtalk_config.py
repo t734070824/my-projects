@@ -6,7 +6,7 @@
 # 1. 在钉钉群聊中添加"自定义机器人"
 # 2. 选择"自定义关键词"安全设置，添加关键词如"交易提醒"
 # 3. 复制生成的Webhook地址到下方
-DINGTALK_WEBHOOK_URL = "https://oapi.dingtalk.com/robot/send?access_token=f039bbc0bc60ddc6ef65edb56505af5aa16e057e1e295a6bfd8835f57858f82e"
+DINGTALK_WEBHOOK_URL = "https://oapi.dingtalk.com/robot/send?access_token=9ae12d4cdaac82d49549bdb46e8f2295bf52cf04d89fcb6d5ee42568be703bca"
 
 # 是否启用钉钉通知
 ENABLE_DINGTALK_NOTIFICATION = True
