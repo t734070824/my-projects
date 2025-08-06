@@ -23,7 +23,7 @@ def setup_notification_callback() -> callable:
     """设置通知回调函数"""
     try:
         # 从配置中加载钉钉通知设置
-        from config import load_app_config
+        from config.settings import load_app_config
         config = load_app_config()
         
         if hasattr(config, 'dingtalk_webhook') and config.dingtalk_webhook:
@@ -63,11 +63,17 @@ def setup_notification_callback() -> callable:
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='加密货币交易系统')
+    parser = argparse.ArgumentParser(
+        description='加密货币交易系统',
+        epilog='示例: python main.py (默认both模式) | python main.py trader --log-level DEBUG',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         'mode',
+        nargs='?',  # 使参数可选
+        default='both',  # 默认值设置为 both
         choices=['trader', 'monitor', 'both'],
-        help='运行模式: trader=主交易程序, monitor=持仓监控, both=同时运行'
+        help='运行模式: trader=主交易程序, monitor=持仓监控, both=同时运行 (默认: both)'
     )
     parser.add_argument(
         '--config',

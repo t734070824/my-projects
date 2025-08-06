@@ -42,7 +42,13 @@ class PositionMonitor:
         self.config = load_app_config(config_path)
         
         # 初始化交易所接口
-        self.exchange = BinanceExchange()
+        exchange_config = {
+            'api_key': self.config.exchange.api_key,
+            'secret_key': self.config.exchange.secret_key,
+            'sandbox': self.config.exchange.sandbox,
+            'proxy': self.config.exchange.proxy
+        }
+        self.exchange = BinanceExchange(exchange_config)
         if not self.exchange.connect():
             raise ConnectionError("无法连接到币安交易所")
         

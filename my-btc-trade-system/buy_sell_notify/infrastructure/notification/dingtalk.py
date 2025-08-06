@@ -149,28 +149,46 @@ class DingTalkNotifier:
             atr_timeframe = atr_info.get('timeframe', '')
             atr_length = atr_info.get('length', 0)
             
+            # 获取ATR倍数
+            atr_multiplier = signal_data.get('atr_multiplier', 
+                            position_info.get('atr_multiplier', 2.0) if position_info else 2.0)
+            
             message_parts.extend([
                 f"",
-                f"**ATR信息**:",
-                f"- ATR值: {atr_value:.6f}",
-                f"- 周期: {atr_timeframe} ({atr_length}期)",
+                f"**技术指标**:",
+                f"- ATR周期: {atr_timeframe}",
+                f"- ATR时长: {atr_length}期",
+                f"- ATR数值: {atr_value:,.4f}",
+                f"- 止损倍数: {atr_multiplier}x ATR",
             ])
         
         # 添加持仓信息
         if position_info:
-            position_size = position_info.get('size', 0)
-            entry_price = position_info.get('entry_price', 0)
-            stop_loss = position_info.get('stop_loss', 0)
-            usdt_amount = position_info.get('usdt_amount', 0)
+            position_size = position_info.get('position_size_coin', position_info.get('size', 0))
+            entry_price = position_info.get('current_price', position_info.get('entry_price', 0))
+            stop_loss = position_info.get('stop_loss_price', position_info.get('stop_loss', 0))
+            usdt_amount = position_info.get('position_value_usd', position_info.get('usdt_amount', 0))
+            max_loss = position_info.get('actual_risk_usd', 0)
             
             message_parts.extend([
                 f"",
-                f"**持仓信息**:",
-                f"- 仓位大小: {position_size}",
-                f"- 入场价格: {entry_price}",
-                f"- 止损价格: {stop_loss}",
-                f"- 仓位价值: {usdt_amount:.2f} USDT",
+                f"**仓位信息**:",
+                f"- 持仓量: {position_size:.6f} {symbol.replace('/USDT', '')}",
+                f"- 入场价格: {entry_price:,.4f} USDT",
+                f"- 持仓价值: {usdt_amount:.2f} USDT",
+                f"- 止损价: {stop_loss:,.4f} USDT",
+                f"- 最大亏损: -{max_loss:.2f} USDT",
             ])
+            
+            # 添加目标价位
+            targets = position_info.get('target_prices', {})
+            if targets:
+                message_parts.extend([f"", f"**目标价位**:"])
+                for i, (key, target) in enumerate(targets.items(), 1):
+                    price = target.get('price', 0)
+                    profit = target.get('profit_amount', 0)
+                    message_parts.append(f"- 目标{i}: {price:,.4f} USDT → +{profit:.2f} USDT")
+            
         
         # 添加时间戳
         message_parts.extend([

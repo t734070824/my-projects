@@ -5,6 +5,8 @@
 
 import json
 import logging
+import uuid
+import hashlib
 from typing import Dict, Any, Optional, Union, List
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -238,3 +240,55 @@ def extract_decision_reason(log_text: str) -> Optional[str]:
         return None
     except Exception:
         return None
+
+
+def generate_trade_id(symbol: str = "", action: str = "", timestamp: Optional[datetime] = None) -> str:
+    """
+    生成唯一的交易ID
+    
+    Args:
+        symbol: 交易对符号
+        action: 交易动作
+        timestamp: 时间戳（可选）
+        
+    Returns:
+        str: 生成的交易ID
+    """
+    if timestamp is None:
+        timestamp = datetime.now()
+    
+    # 方式1: 使用UUID（最简单）
+    if not symbol and not action:
+        return str(uuid.uuid4())
+    
+    # 方式2: 基于参数生成可读ID
+    time_str = timestamp.strftime("%Y%m%d_%H%M%S")
+    
+    # 清理符号和动作
+    clean_symbol = symbol.replace("/", "").replace("-", "") if symbol else "UNKNOWN"
+    clean_action = action.replace("EXECUTE_", "") if action else "TRADE"
+    
+    # 生成短hash确保唯一性
+    content = f"{clean_symbol}_{clean_action}_{time_str}_{timestamp.microsecond}"
+    short_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+    
+    return f"{clean_symbol}_{clean_action}_{time_str}_{short_hash}"
+
+
+def calculate_position_value(size: float, price: float, precision: int = 2) -> float:
+    """
+    计算持仓价值
+    
+    Args:
+        size: 持仓数量
+        price: 价格
+        precision: 精度（小数点位数）
+        
+    Returns:
+        float: 持仓价值
+    """
+    try:
+        value = size * price
+        return round(value, precision)
+    except (TypeError, ValueError):
+        return 0.0

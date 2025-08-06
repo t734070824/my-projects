@@ -13,6 +13,7 @@ from config.settings import AppConfig, TradingPairConfig, load_app_config
 from infrastructure.exchange.binance import BinanceExchange
 from core.signals.generator import SignalGenerator
 from core.decision.engine import DecisionEngine
+from core.risk.position_calculator import PositionCalculator
 from utils.constants import TradingAction, Timeframe
 from utils.helpers import (
     sanitize_log_data, create_log_safe_json, 
@@ -42,10 +43,17 @@ class MainTrader:
         
         # 加载配置
         self.config = load_app_config(config_path)
-        self.logger.info(f"配置加载完成，监控 {len(self.config.trading_pairs)} 个交易对")
+        pairs_count = len(self.config.trading_pairs) if self.config.trading_pairs else len(self.config.symbols_to_analyze)
+        self.logger.info(f"配置加载完成，监控 {pairs_count} 个交易对")
         
         # 初始化交易所接口
-        self.exchange = BinanceExchange()
+        exchange_config = {
+            'api_key': self.config.exchange.api_key,
+            'secret_key': self.config.exchange.secret_key,
+            'sandbox': self.config.exchange.sandbox,
+            'proxy': self.config.exchange.proxy
+        }
+        self.exchange = BinanceExchange(exchange_config)
         if not self.exchange.connect():
             raise ConnectionError("无法连接到币安交易所")
         self.logger.info("交易所连接成功")
@@ -53,6 +61,10 @@ class MainTrader:
         # 初始化决策引擎
         self.decision_engine = DecisionEngine(self.config.strategy_config)
         self.logger.info("决策引擎初始化完成")
+        
+        # 初始化仓位计算器
+        self.position_calculator = PositionCalculator()
+        self.logger.info("仓位计算器初始化完成")
         
         # 运行状态
         self.running = False
@@ -122,7 +134,21 @@ class MainTrader:
         """并发分析所有交易对"""
         results = []
         
-        for pair_config in self.config.trading_pairs:
+        # 确保有交易对配置可供分析
+        trading_pairs = self.config.trading_pairs
+        
+        # 如果trading_pairs为空，使用symbols_to_analyze创建配置
+        if not trading_pairs and self.config.symbols_to_analyze:
+            from config.settings import TradingPairConfig
+            trading_pairs = {
+                symbol: TradingPairConfig(
+                    symbol=symbol,
+                    risk_per_trade_percent=2.5,
+                    atr_multiplier_for_sl=2.0
+                ) for symbol in self.config.symbols_to_analyze
+            }
+        
+        for symbol, pair_config in trading_pairs.items():
             try:
                 result = self._analyze_single_pair(pair_config, account_status)
                 if result:
@@ -336,54 +362,161 @@ class MainTrader:
             decision = result['decision']
             symbol = result['symbol']
             atr_info = result.get('atr_info', {})
+            config = result.get('config')
             
-            # 构建信号详情
-            signal_details = {
-                'symbol': symbol,
-                'action': decision['action'],
-                'confidence': decision['confidence'],
-                'reason': decision['reason'],
-                'strategy': decision.get('strategy', 'unknown'),
-                'timestamp': result['timestamp'].isoformat(),
-            }
+            # 计算完整的仓位详情
+            position_details = None
+            if atr_info and config:
+                # 获取当前价格
+                market_data = result.get('market_data', {})
+                current_price = 0
+                
+                # 从1小时数据中获取当前价格
+                h1_analysis = market_data.get('h1_analysis', {})
+                current_price = h1_analysis.get('close_price', 0)
+                
+                if current_price > 0:
+                    # 构建风险配置
+                    risk_config = {
+                        'atr_multiplier_for_sl': config.atr_multiplier_for_sl,
+                        'risk_per_trade_percent': config.risk_per_trade_percent
+                    }
+                    
+                    # 获取账户余额
+                    portfolio_state = self._build_portfolio_state({'usdt_balance': {'wallet_balance': 10000}})  # 临时使用默认值
+                    account_balance = portfolio_state.get('total_balance', 10000)
+                    
+                    # 计算仓位详情
+                    position_details = self.position_calculator.calculate_position_details(
+                        symbol=symbol,
+                        action=decision['action'],
+                        current_price=current_price,
+                        atr_info=atr_info,
+                        risk_config=risk_config,
+                        account_balance=account_balance
+                    )
             
-            # 添加ATR信息
-            if atr_info:
-                signal_details.update({
-                    'atr': atr_info.get('atr'),
-                    'atr_timeframe': atr_info.get('timeframe'),
-                    'atr_length': atr_info.get('length')
-                })
-            
-            # 添加持仓信息（如果存在）
-            existing_position = result.get('existing_position')
-            if existing_position:
-                signal_details['current_position'] = {
-                    'side': existing_position.get('side'),
-                    'size': existing_position.get('size'),
-                    'entry_price': existing_position.get('entry_price'),
-                    'unrealized_pnl': existing_position.get('unrealized_pnl')
-                }
-            
-            self.logger.info(f"🎯 NEW TRADE SIGNAL: {create_log_safe_json(signal_details)}")
+            # 记录完整的交易信号
+            self._log_complete_trading_signal(result, position_details)
             
         except Exception as e:
-            self.logger.error(f"记录交易信号失败: {e}")
+            self.logger.error(f"记录交易信号失败: {e}", exc_info=True)
+    
+    def _log_complete_trading_signal(self, result: Dict[str, Any], position_details: Optional[Dict[str, Any]]):
+        """记录完整的交易信号（包含仓位详情）"""
+        try:
+            decision = result['decision']
+            symbol = result['symbol']
+            atr_info = result.get('atr_info', {})
+            
+            # 格式化交易信号日志
+            signal_log_parts = [
+                f"🎯 NEW TRADE SIGNAL: {symbol} {result['timestamp'].strftime('%Y-%m-%d %H:%M')}",
+                f"策略类型: {decision.get('strategy', 'unknown')}策略",
+                f"交易方向: {decision['action'].replace('EXECUTE_', '')}",
+                f"决策原因: {decision['reason']}",
+                ""
+            ]
+            
+            # 添加仓位信息
+            if position_details and position_details.get('calculation_valid'):
+                signal_log_parts.extend([
+                    "仓位信息:",
+                    f"•  入场价格: {position_details['current_price']:,.4f} USDT",
+                    f"•  持仓量: {position_details['position_size_coin']:.6f} {symbol.replace('/USDT', '')}",
+                    f"•  持仓价值: {position_details['position_value_usd']:,.2f} USDT",
+                    f"•  止损价: {position_details['stop_loss_price']:,.4f} USDT",
+                    f"•  最大亏损: {-position_details['actual_risk_usd']:,.2f} USDT",
+                    ""
+                ])
+                
+                # 添加技术指标信息
+                signal_log_parts.extend([
+                    "技术指标:",
+                    f"•  ATR周期: {atr_info.get('timeframe', 'unknown')}",
+                    f"•  ATR时长: {atr_info.get('length', 0)}期",
+                    f"•  ATR数值: {position_details['atr_value']:,.4f}",
+                    f"•  止损倍数: {position_details['atr_multiplier']}x ATR",
+                    ""
+                ])
+                
+                # 添加目标价位
+                targets = position_details.get('target_prices', {})
+                if targets:
+                    signal_log_parts.append("目标价位:")
+                    for i, (key, target) in enumerate(targets.items(), 1):
+                        profit = target['profit_amount']
+                        signal_log_parts.append(f"•  目标{i}: {target['price']:,.4f} USDT → +{profit:.2f} USDT")
+                    signal_log_parts.append("")
+                
+                # 验证止损计算
+                expected_distance = position_details['atr_value'] * position_details['atr_multiplier']
+                actual_distance = abs(position_details['current_price'] - position_details['stop_loss_price'])
+                
+                if abs(expected_distance - actual_distance) > 0.01:
+                    signal_log_parts.append(f"⚠️ 计算验证: 期望距离={expected_distance:.4f}, 实际距离={actual_distance:.4f}")
+            else:
+                # 简化信息（如果计算失败）
+                signal_log_parts.extend([
+                    "基本信息:",
+                    f"•  置信度: {decision['confidence']:.1%}",
+                    f"•  ATR: {atr_info.get('atr', 'N/A')}",
+                ])
+            
+            # 添加操作提醒
+            signal_log_parts.append("⚠️ 操作提醒: 严格执行止损，建议分批止盈")
+            
+            # 记录完整日志
+            complete_log = "\n".join(signal_log_parts)
+            self.logger.info(complete_log)
+            
+        except Exception as e:
+            self.logger.error(f"记录完整交易信号失败: {e}", exc_info=True)
     
     def _send_trading_notifications(self, decisions: List[Dict[str, Any]], account_status: Dict[str, Any]):
         """发送交易通知"""
         # 这里应该调用通知模块
-        # 目前先记录日志
+        # 目前先记录日志，包含完整的仓位计算信息
         for decision_result in decisions:
             symbol = decision_result['symbol']
             decision = decision_result['decision']
+            
+            # 重新计算仓位详情（用于通知）
+            position_details = None
+            atr_info = decision_result.get('atr_info', {})
+            config = decision_result.get('config')
+            
+            if atr_info and config:
+                market_data = decision_result.get('market_data', {})
+                h1_analysis = market_data.get('h1_analysis', {})
+                current_price = h1_analysis.get('close_price', 0)
+                
+                if current_price > 0:
+                    risk_config = {
+                        'atr_multiplier_for_sl': config.atr_multiplier_for_sl,
+                        'risk_per_trade_percent': config.risk_per_trade_percent
+                    }
+                    
+                    portfolio_state = self._build_portfolio_state(account_status)
+                    account_balance = portfolio_state.get('total_balance', 10000)
+                    
+                    position_details = self.position_calculator.calculate_position_details(
+                        symbol=symbol,
+                        action=decision['action'],
+                        current_price=current_price,
+                        atr_info=atr_info,
+                        risk_config=risk_config,
+                        account_balance=account_balance
+                    )
             
             notification_data = {
                 'symbol': symbol,
                 'action': decision['action'],
                 'confidence': decision['confidence'],
                 'reason': decision['reason'],
-                'timestamp': decision_result['timestamp'].isoformat()
+                'timestamp': decision_result['timestamp'].isoformat(),
+                'atr_info': atr_info,
+                'position_info': position_details if position_details and position_details.get('calculation_valid') else None
             }
             
             # 过滤敏感信息后记录
@@ -439,7 +572,7 @@ class MainTrader:
             'running': self.running,
             'stats': self.stats.copy(),
             'strategy_status': self.decision_engine.get_strategy_status() if self.decision_engine else None,
-            'monitored_pairs': [pair.symbol for pair in self.config.trading_pairs]
+            'monitored_pairs': list(self.config.trading_pairs.keys()) if self.config.trading_pairs else self.config.symbols_to_analyze
         }
 
 

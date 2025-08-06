@@ -89,8 +89,18 @@ class TradingSystemConfig:
     def _load_from_legacy_config(self):
         """从旧的config.py加载配置"""
         try:
-            # 导入旧配置
-            import config as legacy_config
+            # 导入旧配置 - 使用sys.path和importlib避免命名冲突
+            import sys
+            import os
+            import importlib.util
+            
+            # 获取config.py文件的绝对路径
+            config_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.py')
+            
+            # 使用importlib动态导入config.py文件
+            spec = importlib.util.spec_from_file_location("legacy_config", config_file_path)
+            legacy_config = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(legacy_config)
             
             # 交易所配置
             self.exchange = ExchangeConfig(
