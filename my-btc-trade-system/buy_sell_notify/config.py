@@ -51,14 +51,46 @@ HISTORY_LIMIT = 400
 # You can define specific timeframes and lengths for each symbol.
 # A "DEFAULT" key is required as a fallback for symbols not explicitly listed.
 ATR_CONFIG = {
-    "DEFAULT": {"timeframe": "4h", "length": 20},
-    "BTC/USDT": {"timeframe": "1d", "length": 14},
+    # 默认配置：适合大多数币种
+    "DEFAULT": {"timeframe": "4h", "length": 14},
+    
+    # === Tier 1: 超大市值币种 - 使用更长周期 ===
+    "BTC/USDT": {"timeframe": "1d", "length": 14},        # 比特币：日线14期（经典设置）
     "BTC/USDT:USDT": {"timeframe": "1d", "length": 14},
-    "ETH/USDT": {"timeframe": "4h", "length": 20},
-    "ETH/USDT:USDT": {"timeframe": "4h", "length": 20},
-    # You can add other symbols here, e.g.:
-    "SOL/USDT": {"timeframe": "4h", "length": 20},
-    "SOL/USDT:USDT": {"timeframe": "4h", "length": 20},
+    "ETH/USDT": {"timeframe": "1d", "length": 14},        # 以太坊：同BTC
+    "ETH/USDT:USDT": {"timeframe": "1d", "length": 14},
+    "BNB/USDT": {"timeframe": "4h", "length": 20},        # BNB：4小时20期
+    "BNB/USDT:USDT": {"timeframe": "4h", "length": 20},
+    
+    # === Tier 2: 大市值币种 - 4小时平衡设置 ===
+    "SOL/USDT": {"timeframe": "4h", "length": 14},
+    "SOL/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "XRP/USDT": {"timeframe": "4h", "length": 14},
+    "XRP/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "ADA/USDT": {"timeframe": "4h", "length": 14},
+    "ADA/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "AVAX/USDT": {"timeframe": "4h", "length": 14},
+    "AVAX/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "DOT/USDT": {"timeframe": "4h", "length": 14},
+    "DOT/USDT:USDT": {"timeframe": "4h", "length": 14},
+    
+    # === Tier 3: 中等波动币种 - 较快响应 ===
+    "DOGE/USDT": {"timeframe": "2h", "length": 10},       # 狗狗币：更快响应
+    "DOGE/USDT:USDT": {"timeframe": "2h", "length": 10},
+    "SUI/USDT": {"timeframe": "4h", "length": 10},
+    "SUI/USDT:USDT": {"timeframe": "4h", "length": 10},
+    "LINK/USDT": {"timeframe": "4h", "length": 14},
+    "LINK/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "NEAR/USDT": {"timeframe": "4h", "length": 14},
+    "NEAR/USDT:USDT": {"timeframe": "4h", "length": 14},
+    "UNI/USDT": {"timeframe": "4h", "length": 14},
+    "UNI/USDT:USDT": {"timeframe": "4h", "length": 14},
+    
+    # === Tier 4: 高波动小市值币种 - 最快响应 ===
+    "PEPE/USDT": {"timeframe": "1h", "length": 10},       # Meme币：1小时快速
+    "PEPE/USDT:USDT": {"timeframe": "1h", "length": 10},
+    "WIF/USDT": {"timeframe": "1h", "length": 10},
+    "WIF/USDT:USDT": {"timeframe": "1h", "length": 10},
 }
 
 # --- Virtual Trading Settings ---
