@@ -25,6 +25,7 @@ def send_dingtalk_markdown(title: str, markdown_text: str):
 
     final_url = webhook_url
     
+    
     # --- 智能判断：如果提供了secret，则进行签名计算 ---
     if secret:
         logger.debug("检测到钉钉Secret，将使用加签模式发送。")
