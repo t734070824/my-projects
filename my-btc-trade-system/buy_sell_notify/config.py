@@ -15,8 +15,8 @@ SECRET_KEY = "Ep9pRR8nahbFsTlCJllE8SD981CWygEcFhJ38kSWzvwKIpAXhYl85m4qC3fxKHkc"
 # --- Proxy Settings ---
 # If you don't need a proxy, set it to None.
 # Example: PROXY = None
-# PROXY = 'http://127.0.0.1:10809'
-PROXY = None
+PROXY = 'http://127.0.0.1:10809'
+# PROXY = None
 
 # --- Analysis Settings ---
 # List of symbols to analyze
@@ -53,9 +53,12 @@ HISTORY_LIMIT = 400
 ATR_CONFIG = {
     "DEFAULT": {"timeframe": "4h", "length": 20},
     "BTC/USDT": {"timeframe": "1d", "length": 14},
+    "BTC/USDT:USDT": {"timeframe": "1d", "length": 14},
     "ETH/USDT": {"timeframe": "4h", "length": 20},
+    "ETH/USDT:USDT": {"timeframe": "4h", "length": 20},
     # You can add other symbols here, e.g.:
-        "SOL/USDT": {"timeframe": "4h", "length": 20},
+    "SOL/USDT": {"timeframe": "4h", "length": 20},
+    "SOL/USDT:USDT": {"timeframe": "4h", "length": 20},
 }
 
 # --- Virtual Trading Settings ---
