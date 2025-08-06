@@ -13,7 +13,7 @@ from logger_config import setup_main_logger
 
 # --- 新增：全局变量和自定义日志处理器 ---
 # 用于在内存中临时存储日志的列表
-# 标记
+# 标记2
 ANALYSIS_LOGS = []
 
 class ListLogHandler(logging.Handler):
