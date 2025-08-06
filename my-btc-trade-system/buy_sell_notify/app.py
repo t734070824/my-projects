@@ -49,6 +49,7 @@ def manage_virtual_trade(symbol, final_decision, analysis_data):
 
     # --- 检查是否存在当前交易对的持仓 (关键修复：处理':USDT' 后缀) ---
     existing_position = next((p for p in open_positions if p['symbol'].split(':')[0] == symbol), None)
+    existing_position = None
     
     # --- 获取特定于交易对的虚拟交易配置 ---
     trade_config = config.VIRTUAL_TRADE_CONFIG.get(symbol, config.VIRTUAL_TRADE_CONFIG["DEFAULT"])
@@ -454,11 +455,15 @@ def run_multi_symbol_analysis():
             logging.info(f"[{symbol}] 做空条件检查: 1d看空({not is_long_term_bullish}) && 4h看空({not is_mid_term_bullish}) && 1h卖出({h1_signal in ['STRONG_SELL', 'WEAK_SELL']})")
             
         # 5. 管理虚拟交易（开仓或追踪止损）
+        # 创建包含正确ATR信息的分析数据（使用原始atr_info，不是h1时间框架的ATR）
+        trade_analysis_data = h1_analysis.copy()
+        trade_analysis_data['atr_info'] = atr_info  # 使用正确的ATR配置（可能是1d或4h）
+        
         # 为激进策略使用不同的风险参数
         if reversal_signal in ['EXECUTE_REVERSAL_LONG', 'EXECUTE_REVERSAL_SHORT']:
-            manage_reversal_virtual_trade(symbol, final_decision, h1_analysis)
+            manage_reversal_virtual_trade(symbol, final_decision, trade_analysis_data)
         else:
-            manage_virtual_trade(symbol, final_decision, h1_analysis)
+            manage_virtual_trade(symbol, final_decision, trade_analysis_data)
 
         logging.info(f"==完成分析: {symbol} \n")
 
@@ -646,14 +651,21 @@ def run_analysis_and_notify():
                     atr_timeframe = atr_config["timeframe"]
                     atr_length = atr_config["length"]
                     
-                    # 从ATR距离信息中提取ATR数值（格式: "0.1879 (2.2x ATR)"）
-                    atr_value = ""
+                    # 从ATR距离信息中提取ATR数值和倍数（格式: "8874.0952 (1.8x ATR)"）
+                    stop_loss_distance_val = ""
                     atr_multiplier = ""
+                    original_atr = ""
                     if atr_distance:
                         if "(" in atr_distance and "x ATR)" in atr_distance:
                             parts = atr_distance.split("(")
-                            atr_value = parts[0].strip()
-                            atr_multiplier = parts[1].replace("x ATR)", "").strip()
+                            stop_loss_distance_val = parts[0].strip()
+                            atr_multiplier = parts[1].replace("x ATR)", "").replace("x ATR, 更紧)", "").strip()
+                            # 计算原始ATR值
+                            try:
+                                if atr_multiplier and stop_loss_distance_val:
+                                    original_atr = f"{float(stop_loss_distance_val) / float(atr_multiplier):,.4f}"
+                            except:
+                                original_atr = "N/A"
                     
                     # 获取对应的决策原因
                     decision_reason = signal_decisions.get(symbol, "系统技术指标综合判断")
@@ -684,8 +696,9 @@ def run_analysis_and_notify():
 **技术指标**:
 - ATR周期: {atr_timeframe}
 - ATR时长: {atr_length}期
-- ATR数值: {atr_value}
+- 原始ATR: {original_atr}
 - 止损倍数: {atr_multiplier}x ATR
+- 止损距离: {stop_loss_distance_val}
 
 **目标价位**:
 - 目标1: {target1}
