@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(timeout:*)",
+      "Bash(rm:*)",
+      "Bash(D:/soft/anaconda3/envs/buy_sell_notify_v1/python.exe test_notification_system.py)",
+      "Bash(D:/soft/anaconda3/envs/buy_sell_notify_v1/python.exe test_auto.py)",
+      "Bash(D:/soft/anaconda3/envs/buy_sell_notify_v1/python.exe -c \"import notification_system; print(''通知系统导入成功'')\")",
+      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import notification_system; print(''Import successful'')\")",
+      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import app; print(''Main app imported successfully'')\")",
+      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import ccxt, pandas, pandas_ta, schedule, requests; print(''All dependencies available'')\")",
+      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" system_check.py)"
+    ],
+    "deny": []
+  }
+}
