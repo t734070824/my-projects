@@ -118,3 +118,6 @@ echo "  bash docker_deploy_with_backup.sh hotfix/urgent-fix"
 echo ""
 echo "可用的 Git 分支:"
 git branch -a | head -10
+
+
+docker logs -f buy_sell_sigal_test
