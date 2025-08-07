@@ -29,7 +29,7 @@ SYMBOLS_TO_ANALYZE = [
     # Tier 3: 中市值活跃币 (1B-10B)
     'DOGE/USDT', 'SUI/USDT', 'LINK/USDT', 'NEAR/USDT', 'UNI/USDT',
     # Tier 4: 高波动小市值
-    'PEPE/USDT', 'WIF/USDT'
+    'WIF/USDT'
 ]
 
 # --- Scheduler Settings ---
@@ -87,8 +87,8 @@ ATR_CONFIG = {
     "UNI/USDT:USDT": {"timeframe": "4h", "length": 14},
     
     # === Tier 4: 高波动小市值币种 - 最快响应 ===
-    "PEPE/USDT": {"timeframe": "1h", "length": 10},       # Meme币：1小时快速
-    "PEPE/USDT:USDT": {"timeframe": "1h", "length": 10},
+    # "PEPE/USDT": {"timeframe": "1h", "length": 10},       # Meme币：1小时快速
+    # "PEPE/USDT:USDT": {"timeframe": "1h", "length": 10},
     "WIF/USDT": {"timeframe": "1h", "length": 10},
     "WIF/USDT:USDT": {"timeframe": "1h", "length": 10},
 }
@@ -144,10 +144,10 @@ VIRTUAL_TRADE_CONFIG = {
         "RISK_PER_TRADE_PERCENT": 2.0,  # 波动大，降低风险
         "ATR_MULTIPLIER_FOR_SL": 1.8
     },
-    "PEPE/USDT": {
-        "RISK_PER_TRADE_PERCENT": 1.5,  # meme币风险最小
-        "ATR_MULTIPLIER_FOR_SL": 1.5
-    },
+    # "PEPE/USDT": {
+    #     "RISK_PER_TRADE_PERCENT": 1.5,  # meme币风险最小
+    #     "ATR_MULTIPLIER_FOR_SL": 1.5
+    # },
     "WIF/USDT": {
         "RISK_PER_TRADE_PERCENT": 1.5,
         "ATR_MULTIPLIER_FOR_SL": 1.5
