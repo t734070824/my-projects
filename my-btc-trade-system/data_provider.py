@@ -1,11 +1,10 @@
-
 import requests
 import time
 import hmac
 import hashlib
 from typing import Dict, List, Optional
 
-from config import BINANCE_BASE_URL, BINANCE_KLINES_ENDPOINT, BINANCE_ACCOUNT_ENDPOINT, BINANCE_POSITION_ENDPOINT, BINANCE_USER_TRADES_ENDPOINT, USE_PROXY, SYMBOLS, INTERVAL, TIMEZONE
+from config import BINANCE_BASE_URL, BINANCE_ACCOUNT_ENDPOINT, BINANCE_POSITION_ENDPOINT, USE_PROXY
 from api_keys import API_KEY, SECRET_KEY
 
 def make_api_request(endpoint: str, params: Optional[Dict] = None, auth_required: bool = False) -> Optional[Dict]:
@@ -41,21 +40,6 @@ def make_api_request(endpoint: str, params: Optional[Dict] = None, auth_required
         print(f"API请求失败: {e}")
         return None
 
-def get_binance_klines(symbol: str) -> Optional[List]:
-    """从币安获取指定symbol的K线数据"""
-    params = {'symbol': symbol, 'interval': INTERVAL, 'timeZone': TIMEZONE}
-    return make_api_request(BINANCE_KLINES_ENDPOINT, params)
-
-def get_multiple_symbols_data() -> Dict[str, List]:
-    """获取多个symbol的K线数据"""
-    from analysis import calculate_change_and_amplitude
-    result = {}
-    for symbol in SYMBOLS:
-        klines = get_binance_klines(symbol)
-        if klines:
-            result[symbol] = calculate_change_and_amplitude(klines)
-    return result
-
 def get_account_info() -> Optional[Dict]:
     """获取账户基本信息"""
     return make_api_request(BINANCE_ACCOUNT_ENDPOINT, auth_required=True)
@@ -63,14 +47,3 @@ def get_account_info() -> Optional[Dict]:
 def get_positions() -> Optional[List]:
     """获取合约持仓信息"""
     return make_api_request(BINANCE_POSITION_ENDPOINT, auth_required=True)
-
-def get_user_trades(symbol: str, start_time: Optional[int] = None, end_time: Optional[int] = None, limit: int = 500) -> Optional[List]:
-    """获取用户交易历史"""
-    params = {'symbol': symbol, 'limit': limit}
-    
-    if start_time:
-        params['startTime'] = start_time
-    if end_time:
-        params['endTime'] = end_time
-        
-    return make_api_request(BINANCE_USER_TRADES_ENDPOINT, params, auth_required=True)

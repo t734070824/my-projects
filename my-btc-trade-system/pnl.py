@@ -1,4 +1,3 @@
-
 import os
 import json
 import time
@@ -41,18 +40,12 @@ def record_pnl(account_info: Optional[Dict]) -> None:
         'total_wallet': total_wallet
     }
     
-    # 加载历史记录
     history = load_pnl_history()
-    
-    # 添加新记录
     history.append(record)
     
-    # 清理过期记录（保留指定小时数）
-    current_time = int(time.time())
     max_age = PNL_RECORD_MAX_HOURS * 3600
-    history = [h for h in history if current_time - h['timestamp'] <= max_age]
+    history = [h for h in history if int(time.time()) - h['timestamp'] <= max_age]
     
-    # 保存记录
     save_pnl_history(history)
 
 def get_pnl_statistics() -> Dict[str, Any]:
@@ -61,23 +54,17 @@ def get_pnl_statistics() -> Dict[str, Any]:
     
     if not history:
         return {
-            'max_pnl': 0,
-            'min_pnl': 0,
-            'max_pnl_time': '',
-            'min_pnl_time': '',
-            'current_pnl': 0,
-            'total_records': 0,
-            'average_pnl': 0
+            'max_pnl': 0, 'min_pnl': 0, 'max_pnl_time': '', 'min_pnl_time': '',
+            'current_pnl': 0, 'total_records': 0, 'average_pnl': 0, 'record_hours': 0
         }
     
-    # 找出最高和最低盈亏
+    first_timestamp = history[0]['timestamp']
+    last_timestamp = history[-1]['timestamp']
+    record_duration_hours = (last_timestamp - first_timestamp) / 3600
+
     max_record = max(history, key=lambda x: x['pnl'])
     min_record = min(history, key=lambda x: x['pnl'])
-    
-    # 获取最新记录
-    latest_record = history[-1] if history else {'pnl': 0}
-    
-    # 计算平均盈亏
+    latest_record = history[-1]
     average_pnl = sum(record['pnl'] for record in history) / len(history)
     
     return {
@@ -87,5 +74,6 @@ def get_pnl_statistics() -> Dict[str, Any]:
         'min_pnl_time': min_record['datetime'],
         'current_pnl': latest_record['pnl'],
         'total_records': len(history),
-        'average_pnl': average_pnl
+        'average_pnl': average_pnl,
+        'record_hours': round(record_duration_hours, 1)
     }
