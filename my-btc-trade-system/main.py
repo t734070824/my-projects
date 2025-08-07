@@ -182,7 +182,7 @@ def main() -> None:
     
     # 设置定时任务
     schedule.every(PNL_RECORD_INTERVAL).seconds.do(record_pnl_only)
-    schedule.every(1).minutes.do(monitor_and_notify)
+    schedule.every(10).minutes.do(monitor_and_notify)
     
     while True:
         try:
