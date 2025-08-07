@@ -99,57 +99,57 @@ ATR_CONFIG = {
 # 基于"少而精"理念，提高风险敞口以获得更好的风险回报比
 VIRTUAL_TRADE_CONFIG = {
     "DEFAULT": {
-        "RISK_PER_TRADE_PERCENT": 2.5,  # 提高到2.5% (信号稀少时应该加大单笔)
+        "RISK_PER_TRADE_PERCENT": 1.25,  # 降低到1.25% (原2.5%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.0    # 保持2倍ATR止损
     },
     
     # Tier 1: 超大市值币种 - 最高风险敞口
     "BTC/USDT": {
-        "RISK_PER_TRADE_PERCENT": 5.0,  # BTC信号最稀少且质量最高，提高到5%
+        "RISK_PER_TRADE_PERCENT": 2.5,  # BTC降低到2.5% (原5.0%的一半)
         "ATR_MULTIPLIER_FOR_SL": 1.8    # 稍微收紧止损
     },
     "ETH/USDT": {
-        "RISK_PER_TRADE_PERCENT": 4.0,  # ETH次之，4%
+        "RISK_PER_TRADE_PERCENT": 2.0,  # ETH降低到2.0% (原4.0%的一半)
         "ATR_MULTIPLIER_FOR_SL": 1.8
     },
     "BNB/USDT": {
-        "RISK_PER_TRADE_PERCENT": 3.5,
+        "RISK_PER_TRADE_PERCENT": 1.75,  # BNB降低到1.75% (原3.5%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.0
     },
     
     # Tier 2: 大市值币种 - 中等风险敞口
     "SOL/USDT": {
-        "RISK_PER_TRADE_PERCENT": 3.0,
+        "RISK_PER_TRADE_PERCENT": 1.5,  # SOL降低到1.5% (原3.0%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.0
     },
     "XRP/USDT": {
-        "RISK_PER_TRADE_PERCENT": 3.0,
+        "RISK_PER_TRADE_PERCENT": 1.5,  # XRP降低到1.5% (原3.0%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.2   # 稍微放宽止损
     },
     "ADA/USDT": {
-        "RISK_PER_TRADE_PERCENT": 2.8,
+        "RISK_PER_TRADE_PERCENT": 1.4,  # ADA降低到1.4% (原2.8%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.2
     },
     "AVAX/USDT": {
-        "RISK_PER_TRADE_PERCENT": 2.8,
+        "RISK_PER_TRADE_PERCENT": 1.4,  # AVAX降低到1.4% (原2.8%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.0
     },
     "DOT/USDT": {
-        "RISK_PER_TRADE_PERCENT": 2.5,
+        "RISK_PER_TRADE_PERCENT": 1.25,  # DOT降低到1.25% (原2.5%的一半)
         "ATR_MULTIPLIER_FOR_SL": 2.2
     },
     
     # Tier 3&4: 中小市值币种 - 标准风险敞口但收紧止损
     "DOGE/USDT": {
-        "RISK_PER_TRADE_PERCENT": 2.0,  # 波动大，降低风险
+        "RISK_PER_TRADE_PERCENT": 1.0,  # DOGE降低到1.0% (原2.0%的一半)
         "ATR_MULTIPLIER_FOR_SL": 1.8
     },
     # "PEPE/USDT": {
-    #     "RISK_PER_TRADE_PERCENT": 1.5,  # meme币风险最小
+    #     "RISK_PER_TRADE_PERCENT": 0.75,  # meme币降低到0.75% (原1.5%的一半)
     #     "ATR_MULTIPLIER_FOR_SL": 1.5
     # },
     "WIF/USDT": {
-        "RISK_PER_TRADE_PERCENT": 1.5,
+        "RISK_PER_TRADE_PERCENT": 0.75,  # WIF降低到0.75% (原1.5%的一半)
         "ATR_MULTIPLIER_FOR_SL": 1.5
     }
 }
@@ -162,7 +162,7 @@ REVERSAL_STRATEGY_CONFIG = {
     "timeframe": "1h", # Timeframe to run this strategy on
     "rsi_oversold": 28, # RSI level to trigger a long signal
     "rsi_overbought": 72, # RSI level to trigger a short signal
-    "risk_per_trade_percent": 0.8, # Risk 0.8% of balance for this aggressive strategy
+    "risk_per_trade_percent": 0.4, # Risk 0.4% of balance for this aggressive strategy (原0.8%的一半)
     "atr_multiplier_for_sl": 1.5 # Use a tighter SL (1.5 * ATR) for reversal trades
 }
 
