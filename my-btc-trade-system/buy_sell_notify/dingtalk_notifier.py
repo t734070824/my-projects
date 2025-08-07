@@ -66,7 +66,7 @@ def send_dingtalk_markdown(title: str, markdown_text: str):
         if result.get("errcode") == 0:
             logger.info(f"成功发送钉钉通知，标题: '{title}' (大小: {message_size} bytes)")
         else:
-            logger.error(f"发送钉钉通知失败: {result}")
+            logger.error(f"发送钉钉通知失败: {result}, payload:{payload}")
             # 如果是消息过大错误，尝试发送超精简版本
             if result.get("errcode") == 460101:
                 logger.warning("消息过大，尝试发送超精简版本")
