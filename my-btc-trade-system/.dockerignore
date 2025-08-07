@@ -1,21 +1,29 @@
-# 忽略 Dockerfile 和 .dockerignore 文件本身
-Dockerfile
-.dockerignore
-
-# 忽略 Git 目录
+# Git
 .git
 .gitignore
 
-# 忽略 Python 缓存文件
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE / Editor
+.idea/
+.vscode/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+venv/
+*.env
 
-# 忽略日志文件和历史记录
+# Secrets - IMPORTANT
+api_keys.py
+settings.zip
+
+# Data / Logs
 *.log
 pnl_history.json
 pnl_chart.png
 
-# 再次明确忽略API密钥文件
-api_keys.py
