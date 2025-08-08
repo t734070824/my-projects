@@ -104,7 +104,7 @@
         "price_last_balance": 0.0,
         "check_depth_of_market": {
             "enabled": true,
-            "bids_to_ask_delta": 1
+            "bids_to_ask_delta": 0.9
         }
     },
     
@@ -149,7 +149,7 @@
     },
     
     "telegram": {
-        "enabled": false,
+        "enabled": true,
         "token": "8234359529:AAFOc2pXPvrt2eursl0pm74wSphFs_FID2Q",
         "chat_id": "8022504347",
         "notification_settings": {
