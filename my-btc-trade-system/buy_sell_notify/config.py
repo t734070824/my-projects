@@ -24,12 +24,14 @@ PROXY = None
 SYMBOLS_TO_ANALYZE = [
     # Tier 1: 超大市值 (>100B)
     'BTC/USDT', 'ETH/USDT', 'BNB/USDT',
-    # Tier 2: 大市值 (10B-100B)  
-    'SOL/USDT', 'XRP/USDT', 'ADA/USDT', 'AVAX/USDT', 'DOT/USDT',
+    # Tier 2: 大市值 (10B-100B)
+'XRP/USDT',
+    # 'SOL/USDT', 'ADA/USDT', 'AVAX/USDT', 'DOT/USDT',
     # Tier 3: 中市值活跃币 (1B-10B)
-    'DOGE/USDT', 'SUI/USDT', 'LINK/USDT', 'NEAR/USDT', 'UNI/USDT',
+    'DOGE/USDT',
+    # 'SUI/USDT', 'LINK/USDT', 'NEAR/USDT', 'UNI/USDT',
     # Tier 4: 高波动小市值
-    'WIF/USDT'
+    # 'WIF/USDT'
 ]
 
 # --- Scheduler Settings ---
