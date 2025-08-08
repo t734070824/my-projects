@@ -14,7 +14,8 @@
       "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import notification_system; print(''Import successful'')\")",
       "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import app; print(''Main app imported successfully'')\")",
       "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" -c \"import ccxt, pandas, pandas_ta, schedule, requests; print(''All dependencies available'')\")",
-      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" system_check.py)"
+      "Bash(\"D:\\soft\\anaconda3\\envs\\buy_sell_notify_v1\\python.exe\" system_check.py)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
