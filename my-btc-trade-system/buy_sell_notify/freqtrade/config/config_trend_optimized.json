@@ -115,6 +115,7 @@
     },
     
     "strategy": "TripleTimeframeTrendStrategyOptimized",
+    "timeframe": "1h",
 
     "bot_name": "OptimizedTrendBot",
     "initial_state": "running",
