@@ -130,7 +130,7 @@
     
     "webhook": {
         "enabled": false,
-        "url": "http://127.0.0.1:8080/webhook",
+        "url": "https://oapi.dingtalk.com/robot/send?access_token=506eeb5fa30f3f2b5ddf95ee15b882b676926e47721caac9af4d6eb416c6b303",
         "webhookentry": {
             "value1": "Optimized Strategy Entry",
             "value2": "{{pair}} - {{enter_tag}}",
@@ -150,8 +150,8 @@
     
     "telegram": {
         "enabled": false,
-        "token": "YOUR_TELEGRAM_BOT_TOKEN",
-        "chat_id": "YOUR_TELEGRAM_CHAT_ID",
+        "token": "8234359529:AAFOc2pXPvrt2eursl0pm74wSphFs_FID2Q",
+        "chat_id": "8022504347",
         "notification_settings": {
             "status": "silent",
             "warning": "on",
